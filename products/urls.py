@@ -1,5 +1,8 @@
 from rest_framework.routers import DefaultRouter
-from .views import CategoryViewSet, ProductViewSet, OrderViewSet, NewsletterSubscriptionViewSet, BannerViewSet
+from .views import CategoryViewSet, ProductViewSet, OrderViewSet, NewsletterSubscriptionViewSet, BannerViewSet, SellerRegisterView
+from django.urls import path
+from .views import CustomTokenObtainPairView
+from rest_framework_simplejwt.views import TokenRefreshView
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet)
@@ -10,6 +13,15 @@ router.register(r'banners', BannerViewSet)
 
 urlpatterns = router.urls
 
+
+
+urlpatterns = [
+    path("register/seller/", SellerRegisterView.as_view(), name="seller-register"),
+    path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+]
+
+
 # frontend can now fetch:
 # /api/products/ → All products
 # /api/categories/ → All categories
@@ -17,9 +29,9 @@ urlpatterns = router.urls
 # /api/banners/ → Homepage banners
 # /api/newsletter/ → Newsletter subscribers
 
-# Test in Postman
-# List all products: GET http://127.0.0.1:8000/api/products/
-# Get single product: GET http://127.0.0.1:8000/api/products/1/
-# Add new product: POST http://127.0.0.1:8000/api/products/ (send JSON body + image if needed)
-# Update product: PUT http://127.0.0.1:8000/api/products/1/
-# Delete product: DELETE http://127.0.0.1:8000/api/products/1/
+#test in Postman
+#list all products: GET http://127.0.0.1:8000/api/products/
+#get single product: GET http://127.0.0.1:8000/api/products/1/
+#add new product: POST http://127.0.0.1:8000/api/products/ (send JSON body + image if needed)
+#update product: PUT http://127.0.0.1:8000/api/products/1/
+#delete product: DELETE http://127.0.0.1:8000/api/products/1/
