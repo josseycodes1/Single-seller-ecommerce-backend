@@ -17,6 +17,7 @@ import cloudinary.uploader
 import cloudinary.api
 from decouple import config
 from datetime import timedelta
+import dj_database_url
 
 
 
@@ -67,8 +68,8 @@ CLOUDINARY_STORAGE = {
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000", 
-    "https://scent-shop.vercel.app/", 
+    "http://localhost:3000",
+    "https://scent-shop.vercel.app",
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -79,7 +80,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated", 
+        "rest_framework.permissions.IsAuthenticated",
     ),
 }
 
@@ -105,17 +106,6 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000", 
-]
-
-# JWT Authentication
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
-}
-
 ROOT_URLCONF = "server.urls"
 
 TEMPLATES = [
@@ -140,13 +130,20 @@ WSGI_APPLICATION = "server.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.sqlite3",
+#         "NAME": BASE_DIR / "db.sqlite3",
+#     }
+# }
 
+DATABASES = {
+    "default": dj_database_url.config(
+        default=config('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=False
+    )
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
