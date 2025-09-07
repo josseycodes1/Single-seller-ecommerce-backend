@@ -38,7 +38,7 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
-    "gaming-ecommerce-backend-2w2z.onrender.com",
+    "josseycart-backend.onrender.com",
 ]
 
 AUTH_USER_MODEL = "products.User"
