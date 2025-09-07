@@ -7,27 +7,33 @@ from django.contrib.auth import get_user_model
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError as DjangoValidationError
 
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
-        # Add custom claims inside the token itself (optional)
-        token["email"] = user.email
-        token["is_seller"] = user.is_seller
-        token["business_name"] = user.business_name
+        
+        token["email"] = getattr(user, "email", "")
+        token["is_seller"] = getattr(user, "is_seller", False)
+        token["business_name"] = getattr(user, "business_name", "")
+        token["first_name"] = getattr(user, "first_name", "")
+        token["last_name"] = getattr(user, "last_name", "")
         return token
 
     def validate(self, attrs):
         data = super().validate(attrs)
-        # Add extra fields to the response payload
+      
+        user = self.user
         data.update({
-            "email": self.user.email,
-            "first_name": self.user.first_name,
-            "last_name": self.user.last_name,
-            "business_name": self.user.business_name,
-            "is_seller": self.user.is_seller,
+            "email": getattr(user, "email", ""),
+            "first_name": getattr(user, "first_name", ""),
+            "last_name": getattr(user, "last_name", ""),
+            "business_name": getattr(user, "business_name", ""),
+            "is_seller": getattr(user, "is_seller", False),
         })
         return data
+
 
 User = get_user_model()
 class SellerRegisterSerializer(serializers.ModelSerializer):
