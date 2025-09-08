@@ -1,7 +1,7 @@
 from rest_framework.routers import DefaultRouter
 from .views import CategoryViewSet, ProductViewSet, OrderViewSet, NewsletterSubscriptionViewSet, BannerViewSet, SellerRegisterView
 from django.urls import path, include
-from .views import CustomTokenObtainPairView
+from .views import CustomTokenObtainPairView,  user_profile
 from rest_framework_simplejwt.views import TokenRefreshView
 
 router = DefaultRouter()
@@ -16,6 +16,7 @@ urlpatterns = [
     path("register/seller/", SellerRegisterView.as_view(), name="seller-register"),
     path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+     path("api/user/profile/", user_profile, name="user-profile"), 
 ]
 
 # frontend can now fetch:
