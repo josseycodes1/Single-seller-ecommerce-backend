@@ -21,17 +21,6 @@ from rest_framework.decorators import api_view, permission_classes
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def user_profile(request):
-    user = request.user
-    return Response({
-        'email': user.email,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'business_name': user.business_name,
-        'is_seller': user.is_seller,
-    })
 
 User = get_user_model()
 
