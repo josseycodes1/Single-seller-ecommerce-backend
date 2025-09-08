@@ -81,6 +81,22 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         
         return user
     
+class PasswordResendCodeSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        try:
+            user = User.objects.get(email=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User with this email does not exist.")
+        return value
+
+    def save(self):
+        email = self.validated_data['email']
+        user = User.objects.get(email=email)
+        reset_code = user.generate_reset_code()
+        return reset_code, email
+
 User = get_user_model()
 class SellerRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(

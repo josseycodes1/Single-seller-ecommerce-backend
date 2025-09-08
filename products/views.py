@@ -21,6 +21,7 @@ from rest_framework.decorators import api_view, permission_classes
 from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 from django.core.mail import send_mail
 from django.conf import settings
+from .serializers import PasswordResendCodeSerializer
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -57,6 +58,29 @@ def password_reset_confirm(request):
         serializer.save()
         return Response({
             "message": "Password reset successfully"
+        }, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_resend_code(request):
+    serializer = PasswordResendCodeSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        reset_code, email = serializer.save()
+        
+        # Send email with the new code
+        send_mail(
+            'Password Reset Code',
+            f'Your new password reset code is: {reset_code}. It expires in 15 minutes.',
+            settings.DEFAULT_FROM_EMAIL,
+            [email],
+            fail_silently=False,
+        )
+
+        return Response({
+            "message": "New password reset code sent to email"
         }, status=status.HTTP_200_OK)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

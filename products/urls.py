@@ -1,17 +1,17 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
-from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
-CategoryViewSet, 
-ProductViewSet, 
-OrderViewSet, 
-NewsletterSubscriptionViewSet, 
-BannerViewSet, 
-SellerRegisterView,
-CustomTokenObtainPairView,  
-password_reset_request, 
-password_reset_confirm
+        CategoryViewSet, 
+        ProductViewSet, 
+        OrderViewSet, 
+        NewsletterSubscriptionViewSet, 
+        BannerViewSet, 
+        SellerRegisterView,
+        CustomTokenObtainPairView,  
+        password_reset_request, 
+        password_reset_confirm
 )
+from .views import password_resend_code
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet)
@@ -24,9 +24,9 @@ urlpatterns = [
     path("", include(router.urls)), 
     path("register/seller/", SellerRegisterView.as_view(), name="seller-register"),
     path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
-    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("auth/password-reset/request/", password_reset_request, name="password-reset-request"),
     path("auth/password-reset/confirm/", password_reset_confirm, name="password-reset-confirm"),
+    path("auth/password-reset/resend/", password_resend_code, name="password-resend-code"),
 ]
 
 # frontend can now fetch:
