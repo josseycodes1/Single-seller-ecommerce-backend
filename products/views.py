@@ -18,12 +18,50 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
+from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+from django.core.mail import send_mail
+from django.conf import settings
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
-User = get_user_model()
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset_request(request):
+    serializer = PasswordResetRequestSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        email = serializer.validated_data['email']  # Get the email from validated data
+        reset_code = serializer.save()
+        
+        send_mail(
+            'Password Reset Code',
+            f'Your password reset code is: {reset_code}. It expires in 15 minutes.',
+            settings.DEFAULT_FROM_EMAIL,
+            [email],  # Use the email variable
+            fail_silently=False,
+        )
 
+        return Response({
+            "message": "Password reset code sent to email"
+        }, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset_confirm(request):
+    serializer = PasswordResetConfirmSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        serializer.save()
+        return Response({
+            "message": "Password reset successfully"
+        }, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+User = get_user_model()
 class SellerRegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = SellerRegisterSerializer

@@ -2,7 +2,9 @@ from django.db import models
 from django.utils.text import slugify
 from cloudinary.models import CloudinaryField
 from django.contrib.auth.models import AbstractUser, BaseUserManager
-
+import random
+from datetime import timedelta
+from django.utils import timezone
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -19,15 +21,15 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
         return self.create_user(email, password, **extra_fields)
 
-
 class User(AbstractUser):
     username = None  
     email = models.EmailField(unique=True)
     business_name = models.CharField(max_length=255, blank=True)  
-
     is_seller = models.BooleanField(default=False)
     is_customer = models.BooleanField(default=True)
-
+    reset_code = models.CharField(max_length=6, blank=True, null=True)
+    reset_code_expires = models.DateTimeField(blank=True, null=True)
+    
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = [] 
 
@@ -35,6 +37,22 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+    def generate_reset_code(self):
+        """Generate a 6-digit numerical reset code"""
+        code = str(random.randint(100000, 999999))
+        self.reset_code = code
+        self.reset_code_expires = timezone.now() + timedelta(minutes=59) 
+        self.save()
+        return code
+
+    def is_reset_code_valid(self, code):
+        """Check if the reset code is valid and not expired"""
+        if (self.reset_code == code and 
+            self.reset_code_expires and 
+            self.reset_code_expires > timezone.now()):
+            return True
+        return False
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)

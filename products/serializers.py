@@ -6,8 +6,10 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import serializers
+from django.core.mail import send_mail
+from django.conf import settings
 
-# serializers.py
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
@@ -32,7 +34,53 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         print(f"Token response for user: {self.user.email}, is_seller: {self.user.is_seller}")  # Debug
         return data
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
 
+    def validate_email(self, value):
+        try:
+            user = User.objects.get(email=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User with this email does not exist.")
+        return value
+
+    def save(self):
+        email = self.validated_data['email']
+        user = User.objects.get(email=email)
+        reset_code = user.generate_reset_code()
+        return reset_code
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate(self, attrs):
+        email = attrs['email']
+        code = attrs['code']
+        
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"email": "User with this email does not exist."})
+        
+        if not user.is_reset_code_valid(code):
+            raise serializers.ValidationError({"code": "Invalid or expired reset code."})
+        
+        attrs['user'] = user
+        return attrs
+
+    def save(self):
+        user = self.validated_data['user']
+        new_password = self.validated_data['new_password']
+        
+        user.set_password(new_password)
+        user.reset_code = None
+        user.reset_code_expires = None
+        user.save()
+        
+        return user
+    
 User = get_user_model()
 class SellerRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
