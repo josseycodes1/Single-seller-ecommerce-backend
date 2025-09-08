@@ -38,10 +38,9 @@ class SellerRegisterView(generics.CreateAPIView):
             status=status.HTTP_201_CREATED
         )
 
-
 class IsSeller(BasePermission):
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role == "seller"
+        return request.user.is_authenticated and request.user.is_seller
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
