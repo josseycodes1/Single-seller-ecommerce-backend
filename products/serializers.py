@@ -167,12 +167,10 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ["id", "image_url"]
 
     def get_image_url(self, obj):
-        # Return the Cloudinary URL directly
+     
         if obj.image:
             return obj.image.url
         return None  
-
-
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, required=False)
     offer_price = serializers.SerializerMethodField(required=False)
@@ -221,8 +219,6 @@ class ProductSerializer(serializers.ModelSerializer):
                 ProductImage.objects.create(product=instance, **image_data)
 
         return instance
-
-
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(

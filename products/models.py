@@ -93,7 +93,6 @@ class Product(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
         
-
 class ProductImage(models.Model):
     product = models.ForeignKey(
         Product, 
@@ -106,7 +105,6 @@ class ProductImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.product.name if self.product else 'No Product'}"
-
 
 class Order(models.Model):
     STATUS_CHOICES = [
@@ -153,8 +151,15 @@ class NewsletterSubscription(models.Model):
 
 class Banner(models.Model):
     title = models.CharField(max_length=200)
+    subtitle = models.TextField(blank=True, null=True) 
+    button_text = models.CharField(max_length=50, default="Buy now") 
+    discount_text = models.CharField(max_length=100, blank=True, null=True)  
     image = CloudinaryField('image', blank=True, null=True) 
+    image_mobile = CloudinaryField('image_mobile', blank=True, null=True) 
+    secondary_image = CloudinaryField('secondary_image', blank=True, null=True)
     link = models.URLField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)  
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title

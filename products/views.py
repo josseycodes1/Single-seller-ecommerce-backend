@@ -116,8 +116,6 @@ class ProductViewSet(viewsets.ModelViewSet):
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsSeller()]
         return []
-    
-
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
@@ -128,5 +126,5 @@ class NewsletterSubscriptionViewSet(viewsets.ModelViewSet):
     serializer_class = NewsletterSerializer
 
 class BannerViewSet(viewsets.ModelViewSet):
-    queryset = Banner.objects.all()
+    queryset = Banner.objects.filter(is_active=True).order_by('-created_at')
     serializer_class = BannerSerializer
