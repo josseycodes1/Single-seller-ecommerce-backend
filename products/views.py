@@ -22,6 +22,7 @@ from .serializers import PasswordResetRequestSerializer, PasswordResetConfirmSer
 from django.core.mail import send_mail
 from django.conf import settings
 from .serializers import PasswordResendCodeSerializer
+from rest_framework import viewsets, permissions
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -125,6 +126,7 @@ class NewsletterSubscriptionViewSet(viewsets.ModelViewSet):
     queryset = NewsletterSubscription.objects.all()
     serializer_class = NewsletterSerializer
 
-class BannerViewSet(viewsets.ModelViewSet):
+class BannerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Banner.objects.filter(is_active=True).order_by('-created_at')
     serializer_class = BannerSerializer
+    permission_classes = [permissions.AllowAny] 
