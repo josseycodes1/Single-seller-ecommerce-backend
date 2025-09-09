@@ -160,23 +160,36 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ProductImageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = ProductImage
-        fields = ["id", "image"]  
+        fields = ["id", "image_url"]
+
+    def get_image_url(self, obj):
+        # Return the Cloudinary URL directly
+        if obj.image:
+            return obj.image.url
+        return None  
 
 
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, required=False)
+    offer_price = serializers.SerializerMethodField(required=False)
+    avg_rating = serializers.DecimalField(max_digits=3, decimal_places=1, source='rating', read_only=True)
 
     class Meta:
         model = Product
         fields = [
-            "id", "name", "slug", "price", "description",
-            "stock", "rating", "is_featured",
+            "id", "name", "slug", "price", "offer_price", "description",
+            "stock", "rating", "avg_rating", "is_featured",
             "created_at", "updated_at", "images"
         ]
-        read_only_fields = ["slug", "created_at", "updated_at"]
+        read_only_fields = ["slug", "created_at", "updated_at", "avg_rating"]
 
+    def get_offer_price(self, obj):
+    
+        return obj.price 
     def create(self, validated_data):
         images_data = validated_data.pop("images", [])
         if len(images_data) > 4:
@@ -190,12 +203,10 @@ class ProductSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         images_data = validated_data.pop("images", None)
 
-        
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        
         if images_data is not None:
             existing_count = instance.images.count()
             if existing_count + len(images_data) > 4:
