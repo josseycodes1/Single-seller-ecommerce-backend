@@ -1,6 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, Order, OrderItem, NewsletterSubscription, Banner
-
+from .models import Category, Product, ProductImage, Order, OrderItem, NewsletterSubscription, Banner
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -10,6 +9,12 @@ class CategoryAdmin(admin.ModelAdmin):
     ordering = ("name",)
 
 
+class ProductImageInline(admin.TabularInline):
+    model = ProductImage
+    extra = 0
+    max_num = 4  
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     prepopulated_fields = {"slug": ("name",)}
@@ -17,6 +22,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_filter = ("is_featured", "category")
     search_fields = ("name", "description")
     ordering = ("-created_at",)
+    inlines = [ProductImageInline] 
 
 
 class OrderItemInline(admin.TabularInline):

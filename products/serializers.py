@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Product, Order, OrderItem, NewsletterSubscription, Banner
+from .models import Category, Product, Order, OrderItem, NewsletterSubscription, Banner, ProductImage
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
@@ -159,15 +159,55 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = '__all__'
 
+class ProductImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductImage
+        fields = ["id", "image"]  
+
+
 class ProductSerializer(serializers.ModelSerializer):
-    category = CategorySerializer(read_only=True)
-    category_id = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), source='category', write_only=True
-    )
+    images = ProductImageSerializer(many=True, required=False)
 
     class Meta:
         model = Product
-        fields = '__all__'
+        fields = [
+            "id", "name", "slug", "price", "description",
+            "stock", "rating", "is_featured",
+            "created_at", "updated_at", "images"
+        ]
+        read_only_fields = ["slug", "created_at", "updated_at"]
+
+    def create(self, validated_data):
+        images_data = validated_data.pop("images", [])
+        if len(images_data) > 4:
+            raise serializers.ValidationError("A product can have at most 4 images.")
+        
+        product = Product.objects.create(**validated_data)
+        for image_data in images_data:
+            ProductImage.objects.create(product=product, **image_data)
+        return product
+
+    def update(self, instance, validated_data):
+        images_data = validated_data.pop("images", None)
+
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        
+        if images_data is not None:
+            existing_count = instance.images.count()
+            if existing_count + len(images_data) > 4:
+                raise serializers.ValidationError(
+                    f"Cannot add {len(images_data)} images. "
+                    f"Product already has {existing_count}, max allowed is 4."
+                )
+            for image_data in images_data:
+                ProductImage.objects.create(product=instance, **image_data)
+
+        return instance
+
 
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)

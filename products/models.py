@@ -76,7 +76,6 @@ class Product(models.Model):
     slug = models.SlugField(unique=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField()
-    image = CloudinaryField('image', blank=True, null=True) 
     stock = models.PositiveIntegerField(default=0)
     rating = models.DecimalField(max_digits=3, decimal_places=1, default=0)
     is_featured = models.BooleanField(default=False)
@@ -93,6 +92,21 @@ class Product(models.Model):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
+        
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(
+        Product, 
+        related_name="images", 
+        on_delete=models.SET_NULL,  
+        null=True, 
+        blank=True
+    )
+    image = CloudinaryField('image')
+
+    def __str__(self):
+        return f"Image for {self.product.name if self.product else 'No Product'}"
+
 
 class Order(models.Model):
     STATUS_CHOICES = [

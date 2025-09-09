@@ -116,6 +116,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsSeller()]
         return []
+    
+
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
