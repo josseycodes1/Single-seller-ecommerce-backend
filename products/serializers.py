@@ -176,16 +176,19 @@ class ProductImageSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, required=False)
     offer_price = serializers.SerializerMethodField(required=False)
-    avg_rating = serializers.DecimalField(max_digits=3, decimal_places=1, source='rating', read_only=True)
+    avg_rating = serializers.FloatField(source='rating', read_only=True) 
 
     class Meta:
-        model = Product
-        fields = [
-            "id", "name", "slug", "price", "offer_price", "description",
-            "stock", "rating", "avg_rating", "is_featured",
-            "created_at", "updated_at", "images"
-        ]
-        read_only_fields = ["slug", "created_at", "updated_at", "avg_rating"]
+            model = Product
+            fields = [
+                "id", "name", "slug", "price", "offer_price", "description",
+                "stock", "rating", "avg_rating", "is_featured",
+                "created_at", "updated_at", "images"
+            ]
+            read_only_fields = ["slug", "created_at", "updated_at", "avg_rating"]
+            
+    def get_offer_price(self, obj):
+            return float(obj.price)
 
     def get_offer_price(self, obj):
     
