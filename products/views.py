@@ -23,6 +23,13 @@ from django.core.mail import send_mail
 from django.conf import settings
 from .serializers import PasswordResendCodeSerializer
 from rest_framework import viewsets, permissions
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from .models import NewsletterSubscription
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -130,3 +137,23 @@ class BannerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Banner.objects.filter(is_active=True).order_by('-created_at')
     serializer_class = BannerSerializer
     permission_classes = [permissions.AllowAny] 
+    
+@method_decorator(csrf_exempt, name='dispatch')
+class NewsletterSubscribeView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        email = request.data.get('email')
+        
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if email already exists
+        if NewsletterSubscription.objects.filter(email=email).exists():
+            return Response({"message": "Email already subscribed"}, status=status.HTTP_200_OK)
+        
+        # Create new subscription
+        subscription = NewsletterSubscription(email=email)
+        subscription.save()
+        
+        return Response({"message": "Subscribed successfully"}, status=status.HTTP_201_CREATED)

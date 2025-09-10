@@ -9,7 +9,8 @@ from .views import (
         SellerRegisterView,
         CustomTokenObtainPairView,  
         password_reset_request, 
-        password_reset_confirm
+        password_reset_confirm,
+        NewsletterSubscribeView
 )
 from .views import password_resend_code
 
@@ -27,6 +28,7 @@ urlpatterns = [
     path("auth/password-reset/request/", password_reset_request, name="password-reset-request"),
     path("auth/password-reset/confirm/", password_reset_confirm, name="password-reset-confirm"),
     path("auth/password-reset/resend/", password_resend_code, name="password-resend-code"),
+    path('api/newsletter/subscribe/', NewsletterSubscribeView.as_view(), name='newsletter-subscribe'),
 ]
 
 # frontend can now fetch:
