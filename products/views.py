@@ -148,12 +148,21 @@ class NewsletterSubscribeView(APIView):
         if not email:
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check if email already exists
+        
+        if '@' not in email:
+            return Response({"error": "Please enter a valid email address"}, status=status.HTTP_400_BAD_REQUEST)
+        
+   
         if NewsletterSubscription.objects.filter(email=email).exists():
             return Response({"message": "Email already subscribed"}, status=status.HTTP_200_OK)
         
-        # Create new subscription
-        subscription = NewsletterSubscription(email=email)
-        subscription.save()
+      
+        serializer = NewsletterSerializer(data={'email': email})
         
-        return Response({"message": "Subscribed successfully"}, status=status.HTTP_201_CREATED)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Subscribed successfully"}, status=status.HTTP_201_CREATED)
+        else:
+           
+            error_message = list(serializer.errors.values())[0][0] if serializer.errors else "Invalid email"
+            return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
