@@ -132,6 +132,20 @@ class OrderViewSet(viewsets.ModelViewSet):
 class NewsletterSubscriptionViewSet(viewsets.ModelViewSet):
     queryset = NewsletterSubscription.objects.all()
     serializer_class = NewsletterSerializer
+    
+    def get_permissions(self):
+        # Allow anyone to create subscriptions (POST)
+        if self.action in ['create']:
+            permission_classes = [AllowAny]
+        else:
+            # Require authentication for other operations (list, retrieve, update, delete)
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
+    
+    # Add CSRF exemption for create action
+    @method_decorator(csrf_exempt, name='dispatch')
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
 
 class BannerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Banner.objects.filter(is_active=True).order_by('-created_at')
