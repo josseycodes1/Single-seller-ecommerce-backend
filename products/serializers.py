@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from django.core.mail import send_mail
 from django.conf import settings
-
+from django.utils.text import slugify
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
@@ -154,10 +154,24 @@ class SellerRegisterSerializer(serializers.ModelSerializer):
         user.is_customer = False
         user.save()
         return user
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = '__all__'
+        extra_kwargs = {
+            'slug': {'required': False, 'allow_blank': True}
+        }
+    
+    def create(self, validated_data):
+        if 'slug' not in validated_data or not validated_data['slug']:
+            validated_data['slug'] = slugify(validated_data['name'])
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        if 'name' in validated_data and validated_data['name'] != instance.name:
+            validated_data['slug'] = slugify(validated_data['name'])
+        return super().update(instance, validated_data)
 
 class ProductImageSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
