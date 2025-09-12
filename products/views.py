@@ -124,6 +124,12 @@ class ProductViewSet(viewsets.ModelViewSet):
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsSeller()]
         return []
+    
+    def get_serializer_context(self):
+        # Pass the request to the serializer context
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
