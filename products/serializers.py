@@ -185,44 +185,49 @@ class ProductImageSerializer(serializers.ModelSerializer):
         if obj.image:
             return obj.image.url
         return None  
+
 class ProductSerializer(serializers.ModelSerializer):
-    images = ProductImageSerializer(many=True, required=False)
+    images = ProductImageSerializer(many=True, required=False, read_only=True)
     offer_price = serializers.SerializerMethodField(required=False)
     avg_rating = serializers.FloatField(source='rating', read_only=True) 
 
     class Meta:
-            model = Product
-            fields = [
-                "id", "name", "slug", "price", "offer_price", "description",
-                "stock", "rating", "avg_rating", "is_featured",
-                "created_at", "updated_at", "images"
-            ]
-            read_only_fields = ["slug", "created_at", "updated_at", "avg_rating"]
-            
-    def get_offer_price(self, obj):
-            return float(obj.price)
-
-    def get_offer_price(self, obj):
+        model = Product
+        fields = [
+            "id", "name", "slug", "price", "offer_price", "description",
+            "stock", "rating", "avg_rating", "is_featured",
+            "created_at", "updated_at", "images"
+        ]
+        read_only_fields = ["slug", "created_at", "updated_at", "avg_rating"]
     
-        return obj.price 
+    def get_offer_price(self, obj):
+        return float(obj.price)
+
     def create(self, validated_data):
-        images_data = validated_data.pop("images", [])
+       
+        request = self.context.get('request')
+        images_data = request.FILES.getlist('images') if request else []
+        
         if len(images_data) > 4:
             raise serializers.ValidationError("A product can have at most 4 images.")
         
         product = Product.objects.create(**validated_data)
+        
+       
         for image_data in images_data:
-            ProductImage.objects.create(product=product, **image_data)
+            ProductImage.objects.create(product=product, image=image_data)
+        
         return product
 
     def update(self, instance, validated_data):
-        images_data = validated_data.pop("images", None)
+        request = self.context.get('request')
+        images_data = request.FILES.getlist('images') if request else []
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        if images_data is not None:
+        if images_data:
             existing_count = instance.images.count()
             if existing_count + len(images_data) > 4:
                 raise serializers.ValidationError(
@@ -230,7 +235,7 @@ class ProductSerializer(serializers.ModelSerializer):
                     f"Product already has {existing_count}, max allowed is 4."
                 )
             for image_data in images_data:
-                ProductImage.objects.create(product=instance, **image_data)
+                ProductImage.objects.create(product=instance, image=image_data)
 
         return instance
 class OrderItemSerializer(serializers.ModelSerializer):
