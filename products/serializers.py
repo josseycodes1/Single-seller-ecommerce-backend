@@ -196,7 +196,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "slug", "price", "offer_price", "description",
             "stock", "rating", "avg_rating", "is_featured",
-            "created_at", "updated_at", "images"
+            "created_at", "updated_at", "images", "category"
         ]
         read_only_fields = ["slug", "created_at", "updated_at", "avg_rating"]
     
