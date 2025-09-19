@@ -154,7 +154,6 @@ class SellerRegisterSerializer(serializers.ModelSerializer):
         user.is_customer = False
         user.save()
         return user
-
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
@@ -172,7 +171,6 @@ class CategorySerializer(serializers.ModelSerializer):
         if 'name' in validated_data and validated_data['name'] != instance.name:
             validated_data['slug'] = slugify(validated_data['name'])
         return super().update(instance, validated_data)
-
 class ProductImageSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
 
@@ -185,7 +183,6 @@ class ProductImageSerializer(serializers.ModelSerializer):
         if obj.image:
             return obj.image.url
         return None  
-
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, required=False, read_only=True)
     offer_price = serializers.SerializerMethodField(required=False)
@@ -247,7 +244,6 @@ class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrderItem
         fields = '__all__'
-
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True)
 
@@ -266,8 +262,21 @@ class NewsletterSerializer(serializers.ModelSerializer):
     class Meta:
         model = NewsletterSubscription
         fields = '__all__'
-
 class BannerSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    image_mobile = serializers.SerializerMethodField()
+    secondary_image = serializers.SerializerMethodField()
+
     class Meta:
         model = Banner
         fields = '__all__'
+
+    def get_image(self, obj):
+        return obj.image.url if obj.image else None
+
+    def get_image_mobile(self, obj):
+        return obj.image_mobile.url if obj.image_mobile else None
+
+    def get_secondary_image(self, obj):
+        return obj.secondary_image.url if obj.secondary_image else None
+
