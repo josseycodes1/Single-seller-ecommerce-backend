@@ -117,8 +117,19 @@ class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all()
     serializer_class = ProductSerializer
+
+    def get_queryset(self):
+        queryset = Product.objects.all()
+        is_featured = self.request.query_params.get("is_featured")
+
+        if is_featured is not None:
+            if is_featured.lower() in ["true", "1"]:
+                queryset = queryset.filter(is_featured=True)
+            elif is_featured.lower() in ["false", "0"]:
+                queryset = queryset.filter(is_featured=False)
+
+        return queryset
     
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy"]:
@@ -126,10 +137,10 @@ class ProductViewSet(viewsets.ModelViewSet):
         return []
     
     def get_serializer_context(self):
-        # Pass the request to the serializer context
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
+
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
