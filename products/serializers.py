@@ -10,6 +10,7 @@ from rest_framework import serializers
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.text import slugify
+import json
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
@@ -200,13 +201,15 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_offer_price(self, obj):
         return float(obj.price)
     
-    def to_internal_value(self, data):
-        if "colors" in data and isinstance(data["colors"], str):
+    def validate_colors(self, value):
+        if isinstance(value, str):
             try:
-                data["colors"] = json.loads(data["colors"])
+                return json.loads(value)  # safely parse JSON string
             except json.JSONDecodeError:
-                raise serializers.ValidationError({"colors": "Invalid colors format. Must be a JSON list."})
-        return super().to_internal_value(data)
+                raise serializers.ValidationError(
+                    "Colors must be a valid JSON list, e.g. ['Red', 'Blue']"
+                )
+        return value
 
     def create(self, validated_data):
        
