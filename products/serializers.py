@@ -199,6 +199,14 @@ class ProductSerializer(serializers.ModelSerializer):
     
     def get_offer_price(self, obj):
         return float(obj.price)
+    
+    def to_internal_value(self, data):
+        if "colors" in data and isinstance(data["colors"], str):
+            try:
+                data["colors"] = json.loads(data["colors"])
+            except json.JSONDecodeError:
+                raise serializers.ValidationError({"colors": "Invalid colors format. Must be a JSON list."})
+        return super().to_internal_value(data)
 
     def create(self, validated_data):
        
