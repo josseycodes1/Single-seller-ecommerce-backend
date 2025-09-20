@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 import random
 from datetime import timedelta
 from django.utils import timezone
+from django.contrib.postgres.fields import ArrayField
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -81,6 +82,12 @@ class Product(models.Model):
     is_featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    colors = ArrayField(
+        models.CharField(max_length=50),
+        blank=True,
+        default=list,
+        help_text="List of available colors, e.g. ['Red', 'Blue', 'Black']"
+    )
 
     class Meta:
         ordering = ['-created_at']
