@@ -193,7 +193,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "slug", "price", "offer_price", "description",
             "stock", "rating", "avg_rating", "is_featured",
-            "created_at", "updated_at", "images", "category"
+            "created_at", "updated_at", "images", "category", "colors"
         ]
         read_only_fields = ["slug", "created_at", "updated_at", "avg_rating"]
     
@@ -235,6 +235,7 @@ class ProductSerializer(serializers.ModelSerializer):
                 ProductImage.objects.create(product=instance, image=image_data)
 
         return instance
+    
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(
