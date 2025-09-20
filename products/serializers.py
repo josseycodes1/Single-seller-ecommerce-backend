@@ -201,17 +201,32 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_offer_price(self, obj):
         return float(obj.price)
 
+    def validate_colors(self, value):
+        """Ensure colors is a list of strings"""
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Colors must be a list of strings.")
+        for color in value:
+            if not isinstance(color, str):
+                raise serializers.ValidationError("Each color must be a string.")
+        return value
+
     def create(self, validated_data):
-       
         request = self.context.get('request')
         images_data = request.FILES.getlist('images') if request else []
         
         if len(images_data) > 4:
             raise serializers.ValidationError("A product can have at most 4 images.")
         
+        # Handle colors field
+        colors_data = validated_data.pop('colors', [])
         product = Product.objects.create(**validated_data)
         
-       
+        # Set colors after creating the product
+        if colors_data:
+            product.colors = colors_data
+            product.save()
+        
+        # Create product images
         for image_data in images_data:
             ProductImage.objects.create(product=product, image=image_data)
         
@@ -221,10 +236,18 @@ class ProductSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         images_data = request.FILES.getlist('images') if request else []
 
+        # Update regular fields
         for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+            if attr != 'colors':  # Handle colors separately
+                setattr(instance, attr, value)
+        
+        # Handle colors field
+        if 'colors' in validated_data:
+            instance.colors = validated_data['colors']
+        
         instance.save()
 
+        # Handle images
         if images_data:
             existing_count = instance.images.count()
             if existing_count + len(images_data) > 4:
