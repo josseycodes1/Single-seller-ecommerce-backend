@@ -30,6 +30,7 @@ from rest_framework.permissions import AllowAny
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .models import NewsletterSubscription
+import json
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -130,7 +131,16 @@ class ProductViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
-
+    def create(self, request, *args, **kwargs):
+        # Handle colors as JSON if sent as a single string
+        if 'colors' in request.data and isinstance(request.data['colors'], str):
+            try:
+                request.data._mutable = True
+                request.data['colors'] = json.loads(request.data['colors'])
+                request.data._mutable = False
+            except json.JSONDecodeError:
+                pass
+        return super().create(request, *args, **kwargs)
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
