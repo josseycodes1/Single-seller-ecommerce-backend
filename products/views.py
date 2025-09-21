@@ -30,6 +30,10 @@ from rest_framework.permissions import AllowAny
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from .models import NewsletterSubscription
+import logging
+from rest_framework.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -124,12 +128,27 @@ class ProductViewSet(viewsets.ModelViewSet):
         if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsSeller()]
         return []
-    
+
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context['request'] = self.request
         return context
 
+    def create(self, request, *args, **kwargs):
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except ValidationError as e:
+            logger.error(f"Validation failed: {e.detail}")
+            return Response({"errors": e.detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception("Unexpected error while creating product")
+            return Response(
+                {"error": "Something went wrong. Check server logs."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
