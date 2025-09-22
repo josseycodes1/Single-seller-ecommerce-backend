@@ -185,7 +185,12 @@ class ProductImageSerializer(serializers.ModelSerializer):
             return obj.image.url
         return None  
 class ProductSerializer(serializers.ModelSerializer):
-    images = ProductImageSerializer(many=True, required=False, read_only=True)
+    uploaded_images = serializers.ListField(
+        child=serializers.ImageField(max_length=1000000, allow_empty_file=False, use_url=False),
+        write_only=True,
+        required=False
+    )
+    images = ProductImageSerializer(many=True, read_only=True)
     offer_price = serializers.SerializerMethodField(required=False)
     avg_rating = serializers.FloatField(source='rating', read_only=True) 
 
@@ -194,7 +199,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "slug", "price", "offer_price", "description",
             "stock", "rating", "avg_rating", "is_featured",
-            "created_at", "updated_at", "images", "category", "colors"
+            "created_at", "updated_at", "images", "category", "colors", "uploaded_images"
         ]
         read_only_fields = ["slug", "created_at", "updated_at", "avg_rating"]
 
@@ -223,6 +228,15 @@ class ProductSerializer(serializers.ModelSerializer):
             if not isinstance(color, str):
                 raise serializers.ValidationError("Each color must be a string.")
         return value
+    
+    def create(self, validated_data):
+        uploaded_images = validated_data.pop("uploaded_images", [])
+        product = super().create(validated_data)
+
+        for image in uploaded_images:
+            ProductImage.objects.create(product=product, image=image)
+
+        return product
 
     
 class OrderItemSerializer(serializers.ModelSerializer):
