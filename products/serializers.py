@@ -184,16 +184,18 @@ class ProductImageSerializer(serializers.ModelSerializer):
         if obj.image:
             return obj.image.url
         return None  
+    
 class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, required=False, read_only=True)
-    # Add this field to accept image uploads
     image_files = serializers.ListField(
         child=serializers.ImageField(max_length=1000000, allow_empty_file=False, use_url=False),
         write_only=True,
         required=False
     )
     offer_price = serializers.SerializerMethodField(required=False)
-    avg_rating = serializers.FloatField(source='rating', read_only=True) 
+    avg_rating = serializers.FloatField(source='rating', read_only=True)
+    category = serializers.CharField(source="category.name", read_only=True) 
+    colors = serializers.JSONField() 
 
     class Meta:
         model = Product
@@ -205,26 +207,20 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only_fields = ["slug", "created_at", "updated_at", "avg_rating", "images"]
 
     def create(self, validated_data):
-        # Remove image_files from validated_data before creating product
         image_files = validated_data.pop('image_files', [])
         
-        # Create the product
         product = super().create(validated_data)
         
-        # Create ProductImage objects for each image file
         for image_file in image_files:
             ProductImage.objects.create(product=product, image=image_file)
             
         return product
 
     def update(self, instance, validated_data):
-        # Remove image_files from validated_data before updating product
         image_files = validated_data.pop('image_files', [])
-        
-        # Update the product
+    
         product = super().update(instance, validated_data)
         
-        # Create ProductImage objects for each new image file
         for image_file in image_files:
             ProductImage.objects.create(product=product, image=image_file)
             
@@ -256,7 +252,6 @@ class ProductSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Each color must be a string.")
         return value
 
-    
 class OrderItemSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
     product_id = serializers.PrimaryKeyRelatedField(
