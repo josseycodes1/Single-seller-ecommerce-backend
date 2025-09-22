@@ -193,16 +193,26 @@ class ProductSerializer(serializers.ModelSerializer):
         required=False
     )
     offer_price = serializers.SerializerMethodField(required=False)
-    avg_rating = serializers.FloatField(source='rating', read_only=True)
-    category = serializers.CharField(source="category.name", read_only=True) 
+    avg_rating = serializers.FloatField(source='rating', read_only=True) 
     colors = serializers.JSONField() 
+    category = CategorySerializer(read_only=True)
+
+    category_id = serializers.PrimaryKeyRelatedField(
+        source="category",
+        queryset=Category.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+    
 
     class Meta:
         model = Product
         fields = [
             "id", "name", "slug", "price", "offer_price", "description",
             "stock", "rating", "avg_rating", "is_featured",
-            "created_at", "updated_at", "images", "image_files", "category", "colors"
+            "created_at", "updated_at", "images", "image_files", "category", "colors",
+            "category_id"
         ]
         read_only_fields = ["slug", "created_at", "updated_at", "avg_rating", "images"]
 
