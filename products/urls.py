@@ -10,9 +10,12 @@ from .views import (
         CustomTokenObtainPairView,  
         password_reset_request, 
         password_reset_confirm,
+        CartAPIView, 
+        CartItemAPIView, 
+        ClearCartAPIView,
+        password_resend_code
        
 )
-from .views import password_resend_code
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet)
@@ -28,7 +31,10 @@ urlpatterns = [
     path("auth/password-reset/request/", password_reset_request, name="password-reset-request"),
     path("auth/password-reset/confirm/", password_reset_confirm, name="password-reset-confirm"),
     path("auth/password-reset/resend/", password_resend_code, name="password-resend-code"),
-    # path('api/newsletter/subscribe/', NewsletterSubscribeView.as_view(), name='newsletter-subscribe'),
+    path("cart/", CartAPIView.as_view(), name="cart-create"),
+    path("cart/items/", CartItemAPIView.as_view(), name="cart-add-item"),
+    path("cart/items/<int:item_id>/", CartItemAPIView.as_view(), name="cart-update-item"),
+    path("cart/clear/", ClearCartAPIView.as_view(), name="cart-clear"),
 ]
 
 # frontend can now fetch:

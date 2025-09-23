@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Product, Order, OrderItem, NewsletterSubscription, Banner, ProductImage
+from .models import Category, Product, Order, OrderItem, NewsletterSubscription, Banner, ProductImage, Cart, CartItem
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
@@ -307,3 +307,51 @@ class BannerSerializer(serializers.ModelSerializer):
     def get_secondary_image(self, obj):
         return obj.secondary_image.url if obj.secondary_image else None
 
+class CartItemSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(), 
+        source='product', 
+        write_only=True
+    )
+    total_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CartItem
+        fields = ['id', 'product', 'product_id', 'quantity', 'total_price', 'added_at']
+        read_only_fields = ['id', 'added_at']
+
+    def get_total_price(self, obj):
+        return obj.get_total_price()
+
+class CartSerializer(serializers.ModelSerializer):
+    items = CartItemSerializer(many=True, read_only=True)
+    total_price = serializers.SerializerMethodField()
+    total_quantity = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Cart
+        fields = ['id', 'items', 'total_price', 'total_quantity', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_total_price(self, obj):
+        return obj.get_total_price()
+
+    def get_total_quantity(self, obj):
+        return obj.get_total_quantity()
+
+class AddToCartSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    quantity = serializers.IntegerField(min_value=1, default=1)
+
+    def validate_product_id(self, value):
+        try:
+            product = Product.objects.get(id=value)
+            if product.stock <= 0:
+                raise serializers.ValidationError("Product is out of stock")
+        except Product.DoesNotExist:
+            raise serializers.ValidationError("Product does not exist")
+        return value
+
+class UpdateCartItemSerializer(serializers.Serializer):
+    quantity = serializers.IntegerField(min_value=1)
