@@ -10,6 +10,8 @@ from rest_framework import serializers
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.text import slugify
+from rest_framework import serializers
+from .models import Product, CartItem
 import json
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -345,24 +347,31 @@ class AddToCartSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1, default=1)
     color = serializers.CharField(required=True)
 
-    def validate_product_id(self, value):
+    def validate(self, attrs):
+        product_id = attrs.get('product_id')
+        color = attrs.get('color')
+        
         try:
-            product = Product.objects.get(id=value)
-            if product.stock <= 0:
-                raise serializers.ValidationError("Product is out of stock")
-            self.product = product 
+            product = Product.objects.get(id=product_id)
         except Product.DoesNotExist:
-            raise serializers.ValidationError("Product does not exist")
-        return value
+            error = {"product_id": "Product does not exist"}
+            print("AddToCartSerializer error:", json.dumps(error))
+            raise serializers.ValidationError(error)
 
-    def validate_color(self, value):
-        product = getattr(self, 'product', None)
-        if product and product.colors:
-            if value not in product.colors:
-                raise serializers.ValidationError(
-                    f"Invalid color. Available colors: {product.colors}"
-                )
-        return value
+        if product.stock <= 0:
+            error = {"product_id": "Product is out of stock"}
+            print("AddToCartSerializer error:", json.dumps(error))
+            raise serializers.ValidationError(error)
+
+        # Validate color
+        if product.colors and color not in product.colors:
+            error = {"color": f"Invalid color. Available colors: {product.colors}"}
+            print("AddToCartSerializer error:", json.dumps(error))
+            raise serializers.ValidationError(error)
+
+        # Attach product instance to validated_data for later use
+        attrs['product'] = product
+        return attrs
 
 class UpdateCartItemSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
