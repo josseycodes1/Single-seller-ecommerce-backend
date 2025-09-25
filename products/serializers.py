@@ -343,14 +343,25 @@ class CartSerializer(serializers.ModelSerializer):
 class AddToCartSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
     quantity = serializers.IntegerField(min_value=1, default=1)
+    color = serializers.CharField(required=True)
 
     def validate_product_id(self, value):
         try:
             product = Product.objects.get(id=value)
             if product.stock <= 0:
                 raise serializers.ValidationError("Product is out of stock")
+            self.product = product 
         except Product.DoesNotExist:
             raise serializers.ValidationError("Product does not exist")
+        return value
+
+    def validate_color(self, value):
+        product = getattr(self, 'product', None)
+        if product and product.colors:
+            if value not in product.colors:
+                raise serializers.ValidationError(
+                    f"Invalid color. Available colors: {product.colors}"
+                )
         return value
 
 class UpdateCartItemSerializer(serializers.Serializer):
