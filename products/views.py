@@ -219,19 +219,17 @@ class CartAPIView(APIView):
             return None
 
     def post(self, request):
-        """Create a new empty cart and return it."""
         cart = Cart.objects.create()
         serializer = CartSerializer(cart)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def get(self, request):
-        """Fetch an existing cart by ?cart_id=12."""
         cart_id = request.query_params.get("cart_id")
         if not cart_id:
             return Response({"detail": "cart_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            cart = Cart.objects.get(id=int(cart_id)) 
+            cart = Cart.objects.get(id=cart_id)
         except (ValueError, Cart.DoesNotExist):
             return Response({"detail": "Cart not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -251,7 +249,7 @@ class CartItemAPIView(APIView):
             return Response({"detail": "cart_id and product_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            cart = Cart.objects.get(id=int(cart_id))  # 👈 cast to int
+            cart = Cart.objects.get(id=cart_id)
             product = Product.objects.get(id=int(product_id))
         except (ValueError, Cart.DoesNotExist, Product.DoesNotExist):
             return Response({"detail": "Cart or Product not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -320,7 +318,7 @@ class CartItemDetailView(APIView):
             return Response({"detail": "cart_id and quantity required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            cart = Cart.objects.get(id=int(cart_id))  # 👈 cast to int
+            cart = Cart.objects.get(id=cart_id)
             cart_item = CartItem.objects.get(id=pk, cart=cart)
         except (ValueError, Cart.DoesNotExist, CartItem.DoesNotExist):
             return Response({"detail": "Cart or CartItem not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -332,13 +330,12 @@ class CartItemDetailView(APIView):
         return Response(serializer.data)
 
     def delete(self, request, pk):
-        """Remove a cart item."""
         cart_id = request.data.get("cart_id")
         if not cart_id:
             return Response({"detail": "cart_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            cart = Cart.objects.get(id=int(cart_id))  # 👈 cast to int
+            cart = Cart.objects.get(id=cart_id)
             cart_item = CartItem.objects.get(id=pk, cart=cart)
         except (ValueError, Cart.DoesNotExist, CartItem.DoesNotExist):
             return Response({"detail": "Cart or CartItem not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -357,7 +354,7 @@ class ClearCartAPIView(APIView):
             return Response({"detail": "cart_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            cart = Cart.objects.get(id=int(cart_id))  # 👈 cast to int
+            cart = Cart.objects.get(id=cart_id)
         except (ValueError, Cart.DoesNotExist):
             return Response({"detail": "Cart not found"}, status=status.HTTP_404_NOT_FOUND)
 
