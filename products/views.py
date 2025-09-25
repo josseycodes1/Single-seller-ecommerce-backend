@@ -240,27 +240,44 @@ class CartItemAPIView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        cart_id = request.data.get("cart_id")
-        product_id = request.data.get("product_id")
-        quantity = request.data.get("quantity", 1)
-        color = request.data.get("color", None)
+        data = {
+            "cart_id": request.data.get("cart_id"),
+            "product_id": request.data.get("product_id"),
+            "quantity": request.data.get("quantity", 1),
+            "color": request.data.get("color")
+        }
 
-        if not cart_id or not product_id:
-            return Response({"detail": "cart_id and product_id required"}, status=status.HTTP_400_BAD_REQUEST)
+        cart_id = data["cart_id"]
+        if not cart_id:
+            return Response({"error": "cart_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             cart = Cart.objects.get(id=cart_id)
-            product = Product.objects.get(id=int(product_id))
-        except (ValueError, Cart.DoesNotExist, Product.DoesNotExist):
-            return Response({"detail": "Cart or Product not found"}, status=status.HTTP_404_NOT_FOUND)
+        except (ValueError, Cart.DoesNotExist):
+            return Response({"error": "Cart not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        serializer = AddToCartSerializer(data=data)
+        if serializer.is_valid():
+            product = serializer.validated_data["product"]
+            quantity = serializer.validated_data["quantity"]
+            color = serializer.validated_data["color"]
 
-        cart_item, created = CartItem.objects.get_or_create(cart=cart, product=product, color=color)
-        cart_item.quantity += int(quantity)
-        cart_item.save()
+            # Get or create cart item
+            cart_item, created = CartItem.objects.get_or_create(
+                cart=cart, 
+                product=product, 
+                color=color
+            )
+            cart_item.quantity += quantity
+            cart_item.save()
 
-        serializer = CartSerializer(cart)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            cart_serializer = CartSerializer(cart)
+            return Response(cart_serializer.data, status=status.HTTP_200_OK)
+
+        # If validation fails, log and return JSON errors
+        errors = serializer.errors
+        logger.error(f"AddToCart validation failed: {errors}")
+        return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request, item_id):
       
