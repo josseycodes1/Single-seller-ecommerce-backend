@@ -245,6 +245,7 @@ class CartItemAPIView(APIView):
         cart_id = request.data.get("cart_id")
         product_id = request.data.get("product_id")
         quantity = request.data.get("quantity", 1)
+        color = request.data.get("color", None)
 
         if not cart_id or not product_id:
             return Response({"detail": "cart_id and product_id required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -256,7 +257,7 @@ class CartItemAPIView(APIView):
             return Response({"detail": "Cart or Product not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
-        cart_item, created = CartItem.objects.get_or_create(cart=cart, product=product)
+        cart_item, created = CartItem.objects.get_or_create(cart=cart, product=product, color=color)
         cart_item.quantity += int(quantity)
         cart_item.save()
 
@@ -310,7 +311,6 @@ class CartItemAPIView(APIView):
         except CartItem.DoesNotExist:
             return Response({"error": "Cart item not found"}, status=status.HTTP_404_NOT_FOUND)
          
-
 class CartItemDetailView(APIView):
     def put(self, request, pk):
         cart_id = request.data.get("cart_id")

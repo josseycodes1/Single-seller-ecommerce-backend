@@ -318,7 +318,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CartItem
-        fields = ['id', 'product', 'product_id', 'quantity', 'total_price', 'added_at']
+        fields = ['id', 'product', 'product_id', 'quantity', 'total_price', 'added_at', 'color']
         read_only_fields = ['id', 'added_at']
 
     def get_total_price(self, obj):
