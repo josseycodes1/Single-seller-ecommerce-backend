@@ -203,7 +203,7 @@ class CartItem(models.Model):
     color = models.CharField(max_length=50, blank=True, null=True) 
 
     class Meta:
-        unique_together = ['cart', 'product']
+        unique_together = ['cart', 'product', 'color']
 
     def __str__(self):
         return f"{self.quantity} x {self.product.name}"
