@@ -35,6 +35,7 @@ from django.utils.decorators import method_decorator
 from .models import NewsletterSubscription, Cart, CartItem
 import logging
 from rest_framework.exceptions import ValidationError
+from rest_framework import viewsets, status, filters
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "description"]  
+    ordering_fields = ["price", "created_at"] 
     
     def get_permissions(self):
         if self.action in ["create", "update", "partial_update", "destroy"]:
