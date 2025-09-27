@@ -7,6 +7,7 @@ from datetime import timedelta
 from django.utils import timezone
 from django.contrib.postgres.fields import ArrayField
 import uuid
+from phonenumber_field.modelfields import PhoneNumberField
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -26,14 +27,22 @@ class CustomUserManager(BaseUserManager):
 class User(AbstractUser):
     username = None  
     email = models.EmailField(unique=True)
-    business_name = models.CharField(max_length=255, blank=True)  
+    first_name = models.CharField(max_length=255, blank=True) 
+    last_name = models.CharField(max_length=255, blank=True) 
+    business_name = models.CharField(max_length=255, blank=True) 
+    country = models.CharField(max_length=255, blank=True) 
+    street_address = models.CharField(max_length=255, blank=True) 
+    town = models.CharField(max_length=255, blank=True) 
+    state = models.CharField(max_length=255, blank=True) 
+    postal_code = models.CharField(max_length=20, blank=True) 
+    phone_number = PhoneNumberField(blank=True, null=True, region="NG")
     is_seller = models.BooleanField(default=False)
     is_customer = models.BooleanField(default=True)
     reset_code = models.CharField(max_length=6, blank=True, null=True)
     reset_code_expires = models.DateTimeField(blank=True, null=True)
-    
+
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = [] 
+    REQUIRED_FIELDS = []
 
     objects = CustomUserManager()
 
@@ -41,7 +50,6 @@ class User(AbstractUser):
         return self.email
 
     def generate_reset_code(self):
-        """Generate a 6-digit numerical reset code"""
         code = str(random.randint(100000, 999999))
         self.reset_code = code
         self.reset_code_expires = timezone.now() + timedelta(minutes=59) 
@@ -49,12 +57,20 @@ class User(AbstractUser):
         return code
 
     def is_reset_code_valid(self, code):
-        """Check if the reset code is valid and not expired"""
         if (self.reset_code == code and 
             self.reset_code_expires and 
             self.reset_code_expires > timezone.now()):
             return True
         return False
+    
+class Address(models.Model):
+    user = models.ForeignKey("User", on_delete=models.CASCADE, related_name="addresses")
+    country = models.CharField(max_length=255, blank=True)
+    street_address = models.CharField(max_length=255, blank=True)
+    town = models.CharField(max_length=255, blank=True)
+    state = models.CharField(max_length=255, blank=True)
+    postal_code = models.CharField(max_length=20, blank=True)
+    is_default = models.BooleanField(default=False)
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -131,25 +147,29 @@ class Order(models.Model):
         ('delivered', 'Delivered'),
     ]
 
-    customer_name = models.CharField(max_length=200)
-    customer_email = models.EmailField()
-    customer_phone = models.CharField(max_length=15)
-    customer_address = models.TextField()
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    customer_name = models.CharField(max_length=255, blank=True)
+    customer_email = models.EmailField(blank=True)
+    customer_phone = PhoneNumberField(blank=True, null=True, region="NG")
 
+    address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    order_notes = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Order #{self.id} - {self.customer_name}"
+        return f"Order #{self.id} - {self.customer_name or 'Guest'}"
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    color = models.CharField(max_length=50, blank=True, null=True)
+    
 
     def __str__(self):
         return f"{self.quantity} x {self.product.name}"
@@ -201,6 +221,7 @@ class CartItem(models.Model):
     quantity = models.PositiveIntegerField(default=1)
     added_at = models.DateTimeField(auto_now_add=True)
     color = models.CharField(max_length=50, blank=True, null=True) 
+
 
     class Meta:
         unique_together = ['cart', 'product', 'color']
