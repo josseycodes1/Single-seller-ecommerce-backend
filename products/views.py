@@ -289,11 +289,11 @@ class CartItemAPIView(APIView):
         return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def put(self, request, item_id):
-      
         serializer = UpdateCartItemSerializer(data=request.data)
         if serializer.is_valid():
             cart_id = request.data.get('cart_id')
             quantity = serializer.validated_data['quantity']
+            color = serializer.validated_data.get('color') 
 
             if not cart_id:
                 return Response({"error": "cart_id is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -303,14 +303,19 @@ class CartItemAPIView(APIView):
             except CartItem.DoesNotExist:
                 return Response({"error": "Cart item not found"}, status=status.HTTP_404_NOT_FOUND)
 
-           
-            if quantity > cart_item.product.stock:
-                return Response(
-                    {"error": f"Only {cart_item.product.stock} items available in stock"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            
+            serializer = UpdateCartItemSerializer(
+                data=request.data, 
+                context={'cart_item': cart_item} 
+            )
+            
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+           
             cart_item.quantity = quantity
+            if color: 
+                cart_item.color = color
             cart_item.save()
 
             cart_serializer = CartSerializer(cart_item.cart)
