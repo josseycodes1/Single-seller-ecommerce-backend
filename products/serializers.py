@@ -375,3 +375,19 @@ class AddToCartSerializer(serializers.Serializer):
 
 class UpdateCartItemSerializer(serializers.Serializer):
     quantity = serializers.IntegerField(min_value=1)
+    color = serializers.CharField(required=False)  
+
+    def validate(self, attrs):
+       
+        cart_item = self.context.get('cart_item')
+        if cart_item and 'color' in attrs:
+            product = cart_item.product
+            color = attrs['color']
+            
+            
+            if product.colors and color not in product.colors:
+                raise serializers.ValidationError({
+                    "color": f"Invalid color. Available colors: {product.colors}"
+                })
+        
+        return attrs
