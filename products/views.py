@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .models import Category, Product, Order, NewsletterSubscription, Banner
+from .models import Category, Product, Order, NewsletterSubscription, Banner, Payment, OrderItem, Address
 from .serializers import (
     CategorySerializer,
     ProductSerializer,
@@ -38,8 +38,13 @@ from rest_framework.exceptions import ValidationError
 from rest_framework import viewsets, status, filters
 import uuid
 from .paystack import PaystackService
-from .models import Payment, OrderItem, Address
 from .serializers import PaymentSerializer, InitializePaymentSerializer, VerifyPaymentSerializer, CheckoutSerializer
+import json
+import hmac
+import hashlib
+from django.conf import settings
+from django.http import JsonResponse
+from django.views import View
 
 logger = logging.getLogger(__name__)
 
@@ -484,13 +489,13 @@ class InitializePaymentAPIView(APIView):
                 if total_amount <= 0:
                     return Response({"error": "Invalid order amount"}, status=status.HTTP_400_BAD_REQUEST)
                 
-            
+              
                 payment_reference = f"PYMT_{uuid.uuid4().hex[:10].upper()}"
                 
-    
+              
                 paystack_service = PaystackService()
                 
-             
+               
                 if not callback_url:
                     callback_url = f"{settings.FRONTEND_URL}/payment/verify"
                 
@@ -502,7 +507,7 @@ class InitializePaymentAPIView(APIView):
                 )
                 
                 if paystack_response.get('status'):
-                  
+               
                     payment = Payment.objects.create(
                         order=None,  
                         payment_reference=payment_reference,
@@ -517,7 +522,8 @@ class InitializePaymentAPIView(APIView):
                         "access_code": paystack_response['data']['access_code'],
                         "reference": payment_reference,
                         "amount": float(total_amount),
-                        "email": email
+                        "email": email,
+                        "callback_url": callback_url
                     }, status=status.HTTP_200_OK)
                 else:
                     return Response({
@@ -590,46 +596,141 @@ class VerifyPaymentAPIView(APIView):
             logger.error(f"Payment verification error: {str(e)}")
             return Response({"error": "Payment verification failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class PaymentWebhookAPIView(APIView):
-    permission_classes = [AllowAny]
+class PaymentWebhookAPIView(View):
+
+    def post(self, request, *args, **kwargs):
     
-    def post(self, request):
-  
-        signature = request.headers.get('x-paystack-signature')
-        if not self.verify_webhook_signature(request.body, signature):
-            return Response({"error": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        payload = request.data
-        event = payload.get('event')
-        
-        if event == 'charge.success':
-            data = payload.get('data')
-            reference = data.get('reference')
-            
-            try:
-                payment = Payment.objects.get(payment_reference=reference)
-                payment.status = 'success'
-                payment.paystack_reference = data.get('paystack_reference')
+        payload = request.body
+
+      
+        try:
+            logger.info("Paystack webhook payload: %s", payload.decode("utf-8"))
+        except Exception:
+            logger.error("Unable to decode Paystack payload")
+
+        signature = request.headers.get("x-paystack-signature")
+        if not signature:
+            logger.warning("Webhook rejected: Missing Paystack signature")
+            return JsonResponse({"error": "Missing Paystack signature"}, status=400)
+
+        if not self.verify_signature(payload, signature):
+            logger.warning("Webhook rejected: Invalid Paystack signature")
+            return JsonResponse({"error": "Invalid signature"}, status=400)
+
+        try:
+            event = json.loads(payload.decode("utf-8"))
+        except json.JSONDecodeError:
+            logger.error("Webhook rejected: Invalid JSON format")
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        event_type = event.get("event")
+        data = event.get("data", {})
+
+        logger.info("Webhook event received: %s", event_type)
+
+
+        if event_type == "charge.success":
+            reference = data.get("reference")
+            amount = data.get("amount", 0) / 100  
+
+            payment, created = Payment.objects.get_or_create(
+                reference=reference,
+                defaults={
+                    "amount": amount,
+                    "status": "success",
+                    "payment_method": data.get("channel"),
+                },
+            )
+
+            if not created: 
+                payment.status = "success"
+                payment.payment_method = data.get("channel")
                 payment.save()
 
-                
-                logger.info(f"Payment {reference} confirmed via webhook")
-                
-            except Payment.DoesNotExist:
-                logger.error(f"Payment {reference} not found in webhook")
-        
-        return Response({"status": "success"})
-    
-    def verify_webhook_signature(self, payload, signature):
-       
-        import hashlib
-        import hmac
-        
-        webhook_secret = settings.PAYSTACK_WEBHOOK_SECRET
+            logger.info("Payment processed successfully: %s", reference)
+
+            return JsonResponse({
+                "status": "success",
+                "reference": reference,
+                "amount": amount,
+                "payment_method": data.get("channel")
+            }, status=200)
+
+   
+        logger.info("Unhandled Paystack event type: %s", event_type)
+        return JsonResponse({
+            "status": "ignored",
+            "event": event_type
+        }, status=200)
+
+    def verify_signature(self, payload, signature):
+        """
+        Verify Paystack webhook signature using secret key.
+        """
+        secret = settings.PAYSTACK_SECRET_KEY.encode("utf-8")
+
         computed_signature = hmac.new(
-            webhook_secret.encode('utf-8'),
-            payload,
-            hashlib.sha512
+            secret, payload, hashlib.sha512
         ).hexdigest()
-        
+
+        return hmac.compare_digest(computed_signature, signature)
+    """
+    Handles Paystack webhook events.
+    """
+
+    def post(self, request, *args, **kwargs):
+        payload = request.body
+
+      
+        signature = request.headers.get("x-paystack-signature")
+
+        if not signature:
+            return JsonResponse({"error": "Missing Paystack signature"}, status=400)
+
+        if not self.verify_signature(payload, signature):
+            return JsonResponse({"error": "Invalid signature"}, status=400)
+
+     
+        try:
+            event = json.loads(payload.decode("utf-8"))
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        event_type = event.get("event")
+        data = event.get("data", {})
+
+       
+        if event_type == "charge.success":
+            reference = data.get("reference")
+            amount = data.get("amount", 0) / 100 
+
+            payment, created = Payment.objects.get_or_create(
+                reference=reference,
+                defaults={
+                    "amount": amount,
+                    "status": "success",
+                    "payment_method": data.get("channel"),
+                },
+            )
+
+            if not created:  
+                payment.status = "success"
+                payment.payment_method = data.get("channel")
+                payment.save()
+
+            return JsonResponse({"status": "success"}, status=200)
+
+       
+        return JsonResponse({"status": "ignored", "event": event_type}, status=200)
+
+    def verify_signature(self, payload, signature):
+        """
+        Verify Paystack webhook signature using your secret key.
+        """
+        secret = settings.PAYSTACK_SECRET_KEY.encode("utf-8")
+
+        computed_signature = hmac.new(
+            secret, payload, hashlib.sha512
+        ).hexdigest()
+
         return hmac.compare_digest(computed_signature, signature)

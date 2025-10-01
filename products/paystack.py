@@ -34,15 +34,18 @@ class PaystackService:
     
     def initialize_payment(self, email, amount, reference, callback_url=None):
         """Initialize payment with Paystack"""
-        amount_in_kobo = int(amount * 100)  # Paystack uses kobo
+        amount_in_kobo = int(amount * 100) 
         
         data = {
             "email": email,
             "amount": amount_in_kobo,
             "reference": reference,
-            "callback_url": callback_url,
             "currency": "NGN"
         }
+        
+    
+        if callback_url:
+            data["https://scent-shop.vercel.app/payment/verify"] = callback_url
         
         response = self._make_request("POST", "/transaction/initialize", data)
         return response

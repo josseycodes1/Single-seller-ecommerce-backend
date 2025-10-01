@@ -39,4 +39,5 @@ urlpatterns = [
     path('api/payment/initialize/', InitializePaymentAPIView.as_view(), name='initialize-payment'),
     path('api/payment/verify/', VerifyPaymentAPIView.as_view(), name='verify-payment'),
     path('api/payment/webhook/', PaymentWebhookAPIView.as_view(), name='payment-webhook'),
+    path("payment/webhook/", PaymentWebhookAPIView.as_view(), name="paystack-webhook"),
 ]
