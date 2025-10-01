@@ -416,46 +416,72 @@ class CheckoutAPIView(APIView):
                 address_data = serializer.validated_data['address']
                 order_notes = serializer.validated_data.get('order_notes', '')
                 
-          
+              
                 try:
                     cart = Cart.objects.get(id=cart_id)
                 except Cart.DoesNotExist:
-                    return Response({"error": "Cart not found"}, status=status.HTTP_404_NOT_FOUND)
+                    return Response({
+                        "error": "Cart not found",
+                        "details": f"Cart with ID {cart_id} does not exist"
+                    }, status=status.HTTP_404_NOT_FOUND)
                 
                 if cart.items.count() == 0:
-                    return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({
+                        "error": "Cart is empty",
+                        "details": "Cannot checkout with an empty cart"
+                    }, status=status.HTTP_400_BAD_REQUEST)
                 
                
-                address = Address.objects.create(
-                    country=address_data['country'],
-                    street_address=address_data['street_address'],
-                    town=address_data['town'],
-                    state=address_data['state'],
-                    postal_code=address_data['postal_code'],
-                    is_default=False
-                )
-                
-           
-                order = Order.objects.create(
-                    customer_name=customer_name,
-                    customer_email=email,
-                    customer_phone=customer_phone,
-                    address=address,
-                    order_notes=order_notes,
-                    status='pending'
-                )
-                
-              
-                total_amount = 0
-                for cart_item in cart.items.all():
-                    OrderItem.objects.create(
-                        order=order,
-                        product=cart_item.product,
-                        quantity=cart_item.quantity,
-                        price=cart_item.product.price,
-                        color=cart_item.color
+                try:
+                    address = Address.objects.create(
+                        country=address_data['country'],
+                        street_address=address_data['street_address'],
+                        town=address_data['town'],
+                        state=address_data['state'],
+                        postal_code=address_data['postal_code'],
+                        is_default=False
+                      
                     )
-                    total_amount += cart_item.quantity * cart_item.product.price
+                except Exception as e:
+                    return Response({
+                        "error": "Failed to create address",
+                        "details": str(e)
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+        
+                try:
+                    order = Order.objects.create(
+                        customer_name=customer_name,
+                        customer_email=email,
+                        customer_phone=customer_phone,
+                        address=address,
+                        order_notes=order_notes,
+                        status='pending'
+                    )
+                except Exception as e:
+                    return Response({
+                        "error": "Failed to create order",
+                        "details": str(e),
+                        "field_errors": "Check customer_phone format or other field constraints"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+             
+                total_amount = 0
+                try:
+                    for cart_item in cart.items.all():
+                        OrderItem.objects.create(
+                            order=order,
+                            product=cart_item.product,
+                            quantity=cart_item.quantity,
+                            price=cart_item.product.price,
+                            color=cart_item.color
+                        )
+                        total_amount += cart_item.quantity * cart_item.product.price
+                except Exception as e:
+                    return Response({
+                        "error": "Failed to create order items",
+                        "details": str(e)
+                    }, status=status.HTTP_400_BAD_REQUEST)
                 
                 order.total_amount = total_amount
                 order.save()
@@ -469,9 +495,16 @@ class CheckoutAPIView(APIView):
                 
             except Exception as e:
                 logger.error(f"Checkout error: {str(e)}")
-                return Response({"error": "Failed to create order"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response({
+                    "error": "Checkout process failed",
+                    "details": str(e),
+                    "type": type(e).__name__
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "error": "Invalid data",
+            "details": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 class InitializePaymentAPIView(APIView):
     permission_classes = [AllowAny]
@@ -602,27 +635,27 @@ class PaymentWebhookAPIView(View):
     """
 
     def post(self, request, *args, **kwargs):
-        # Raw body from Paystack
+      
         payload = request.body
 
-        # Log raw payload for debugging
+      
         try:
             logger.info("Paystack webhook payload: %s", payload.decode("utf-8"))
         except Exception:
             logger.error("Unable to decode Paystack payload")
 
-        # Get signature from header
+   
         signature = request.headers.get("x-paystack-signature")
         if not signature:
             logger.warning("Webhook rejected: Missing Paystack signature")
             return JsonResponse({"error": "Missing Paystack signature"}, status=400)
 
-        # Verify signature
+
         if not self.verify_signature(payload, signature):
             logger.warning("Webhook rejected: Invalid Paystack signature")
             return JsonResponse({"error": "Invalid signature"}, status=400)
 
-        # Parse event data
+
         try:
             event = json.loads(payload.decode("utf-8"))
         except json.JSONDecodeError:
@@ -634,10 +667,10 @@ class PaymentWebhookAPIView(View):
 
         logger.info("Webhook event received: %s", event_type)
 
-        # 🔹 Handle charge.success
+       
         if event_type == "charge.success":
             reference = data.get("reference")
-            amount = data.get("amount", 0) / 100  # kobo → naira
+            amount = data.get("amount", 0) / 100 
 
             payment, created = Payment.objects.get_or_create(
                 payment_reference=reference,
@@ -648,7 +681,7 @@ class PaymentWebhookAPIView(View):
                 },
             )
 
-            if not created:  # update existing
+            if not created: 
                 payment.status = "success"
                 payment.payment_method = data.get("channel")
                 payment.save()
@@ -662,7 +695,7 @@ class PaymentWebhookAPIView(View):
                 "payment_method": data.get("channel")
             }, status=200)
 
-        # 🔹 Handle other events if needed
+       
         logger.info("Unhandled Paystack event type: %s", event_type)
         return JsonResponse({
             "status": "ignored",

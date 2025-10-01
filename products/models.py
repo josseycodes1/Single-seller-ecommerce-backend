@@ -64,7 +64,7 @@ class User(AbstractUser):
         return False
     
 class Address(models.Model):
-    user = models.ForeignKey("User", on_delete=models.CASCADE, related_name="addresses")
+    user = models.ForeignKey("User", on_delete=models.SET_NULL, null=True, blank=True)
     country = models.CharField(max_length=255, blank=True)
     street_address = models.CharField(max_length=255, blank=True)
     town = models.CharField(max_length=255, blank=True)
