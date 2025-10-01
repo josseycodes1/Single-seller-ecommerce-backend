@@ -400,20 +400,26 @@ class PaymentSerializer(serializers.ModelSerializer):
 class InitializePaymentSerializer(serializers.Serializer):
     cart_id = serializers.UUIDField()
     email = serializers.EmailField()
+    order_id = serializers.IntegerField() 
     callback_url = serializers.URLField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         cart_id = attrs['cart_id']
+        order_id = attrs['order_id']
         
         try:
             cart = Cart.objects.get(id=cart_id)
+            order = Order.objects.get(id=order_id)
         except Cart.DoesNotExist:
             raise serializers.ValidationError({"cart_id": "Cart not found"})
+        except Order.DoesNotExist:
+            raise serializers.ValidationError({"order_id": "Order not found"})
         
         if not cart.items.exists():
             raise serializers.ValidationError({"cart_id": "Cart is empty"})
         
         attrs['cart'] = cart
+        attrs['order'] = order  
         return attrs
 
 class VerifyPaymentSerializer(serializers.Serializer):
