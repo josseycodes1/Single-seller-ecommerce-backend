@@ -151,18 +151,47 @@ class Order(models.Model):
     customer_name = models.CharField(max_length=255, blank=True)
     customer_email = models.EmailField(blank=True)
     customer_phone = PhoneNumberField(blank=True, null=True, region="NG")
-
     address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     order_notes = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_paid = models.BooleanField(default=False)
+    payment_status = models.CharField(max_length=20, default='pending')
+    
+    def calculate_total(self):
+        total = sum(item.quantity * item.price for item in self.items.all())
+        self.total_amount = total
+        self.save()
+        return total
+    
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
         return f"Order #{self.id} - {self.customer_name or 'Guest'}"
-
+    
+class Payment(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+        ('abandoned', 'Abandoned'),
+    ]
+    
+    order = models.ForeignKey("Order", on_delete=models.CASCADE, related_name='payments')
+    payment_reference = models.CharField(max_length=100, unique=True)
+    paystack_reference = models.CharField(max_length=100, blank=True, null=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    email = models.EmailField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Payment {self.payment_reference} - {self.status}"
+    
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)

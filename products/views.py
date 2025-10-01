@@ -36,6 +36,10 @@ from .models import NewsletterSubscription, Cart, CartItem
 import logging
 from rest_framework.exceptions import ValidationError
 from rest_framework import viewsets, status, filters
+import uuid
+from .paystack import PaystackService
+from .models import Payment, OrderItem, Address
+from .serializers import PaymentSerializer, InitializePaymentSerializer, VerifyPaymentSerializer, CheckoutSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -392,3 +396,240 @@ class ClearCartAPIView(APIView):
         cart.items.all().delete()
         serializer = CartSerializer(cart)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class CheckoutAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = CheckoutSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                cart_id = serializer.validated_data['cart_id']
+                email = serializer.validated_data['email']
+                customer_name = serializer.validated_data['customer_name']
+                customer_phone = serializer.validated_data['customer_phone']
+                address_data = serializer.validated_data['address']
+                order_notes = serializer.validated_data.get('order_notes', '')
+                
+          
+                try:
+                    cart = Cart.objects.get(id=cart_id)
+                except Cart.DoesNotExist:
+                    return Response({"error": "Cart not found"}, status=status.HTTP_404_NOT_FOUND)
+                
+                if cart.items.count() == 0:
+                    return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
+                
+               
+                address = Address.objects.create(
+                    country=address_data['country'],
+                    street_address=address_data['street_address'],
+                    town=address_data['town'],
+                    state=address_data['state'],
+                    postal_code=address_data['postal_code'],
+                    is_default=False
+                )
+                
+           
+                order = Order.objects.create(
+                    customer_name=customer_name,
+                    customer_email=email,
+                    customer_phone=customer_phone,
+                    address=address,
+                    order_notes=order_notes,
+                    status='pending'
+                )
+                
+              
+                total_amount = 0
+                for cart_item in cart.items.all():
+                    OrderItem.objects.create(
+                        order=order,
+                        product=cart_item.product,
+                        quantity=cart_item.quantity,
+                        price=cart_item.product.price,
+                        color=cart_item.color
+                    )
+                    total_amount += cart_item.quantity * cart_item.product.price
+                
+                order.total_amount = total_amount
+                order.save()
+                
+                return Response({
+                    "success": True,
+                    "order_id": order.id,
+                    "total_amount": float(total_amount),
+                    "message": "Order created successfully"
+                }, status=status.HTTP_201_CREATED)
+                
+            except Exception as e:
+                logger.error(f"Checkout error: {str(e)}")
+                return Response({"error": "Failed to create order"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class InitializePaymentAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = InitializePaymentSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                cart = serializer.validated_data['cart']
+                email = serializer.validated_data['email']
+                callback_url = serializer.validated_data.get('callback_url')
+                
+                total_amount = cart.get_total_price()
+                
+                if total_amount <= 0:
+                    return Response({"error": "Invalid order amount"}, status=status.HTTP_400_BAD_REQUEST)
+                
+            
+                payment_reference = f"PYMT_{uuid.uuid4().hex[:10].upper()}"
+                
+    
+                paystack_service = PaystackService()
+                
+             
+                if not callback_url:
+                    callback_url = f"{settings.FRONTEND_URL}/payment/verify"
+                
+                paystack_response = paystack_service.initialize_payment(
+                    email=email,
+                    amount=float(total_amount),
+                    reference=payment_reference,
+                    callback_url=callback_url
+                )
+                
+                if paystack_response.get('status'):
+                  
+                    payment = Payment.objects.create(
+                        order=None,  
+                        payment_reference=payment_reference,
+                        amount=total_amount,
+                        email=email,
+                        status='pending'
+                    )
+                    
+                    return Response({
+                        "success": True,
+                        "authorization_url": paystack_response['data']['authorization_url'],
+                        "access_code": paystack_response['data']['access_code'],
+                        "reference": payment_reference,
+                        "amount": float(total_amount),
+                        "email": email
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        "error": "Failed to initialize payment",
+                        "details": paystack_response.get('message', 'Unknown error')
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+            except Exception as e:
+                logger.error(f"Payment initialization error: {str(e)}")
+                return Response({"error": "Payment initialization failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class VerifyPaymentAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        reference = request.GET.get('reference')
+        
+        if not reference:
+            return Response({"error": "Reference is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            paystack_service = PaystackService()
+            verification_response = paystack_service.verify_payment(reference)
+            
+            if verification_response.get('status'):
+                data = verification_response['data']
+                
+                try:
+                    payment = Payment.objects.get(payment_reference=reference)
+                    
+                    if data['status'] == 'success':
+                        payment.status = 'success'
+                        payment.paystack_reference = data.get('reference')
+                        payment.save()
+                        
+
+                        
+                        return Response({
+                            "success": True,
+                            "status": "success",
+                            "message": "Payment verified successfully",
+                            "payment_data": {
+                                "reference": payment.payment_reference,
+                                "amount": float(payment.amount),
+                                "email": payment.email,
+                                "paid_at": data.get('paid_at')
+                            }
+                        })
+                    else:
+                        payment.status = 'failed'
+                        payment.save()
+                        
+                        return Response({
+                            "success": False,
+                            "status": "failed",
+                            "message": data.get('gateway_response', 'Payment failed')
+                        })
+                        
+                except Payment.DoesNotExist:
+                    return Response({"error": "Payment record not found"}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                return Response({
+                    "error": "Payment verification failed",
+                    "details": verification_response.get('message', 'Unknown error')
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Payment verification error: {str(e)}")
+            return Response({"error": "Payment verification failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class PaymentWebhookAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+  
+        signature = request.headers.get('x-paystack-signature')
+        if not self.verify_webhook_signature(request.body, signature):
+            return Response({"error": "Invalid signature"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        payload = request.data
+        event = payload.get('event')
+        
+        if event == 'charge.success':
+            data = payload.get('data')
+            reference = data.get('reference')
+            
+            try:
+                payment = Payment.objects.get(payment_reference=reference)
+                payment.status = 'success'
+                payment.paystack_reference = data.get('paystack_reference')
+                payment.save()
+
+                
+                logger.info(f"Payment {reference} confirmed via webhook")
+                
+            except Payment.DoesNotExist:
+                logger.error(f"Payment {reference} not found in webhook")
+        
+        return Response({"status": "success"})
+    
+    def verify_webhook_signature(self, payload, signature):
+       
+        import hashlib
+        import hmac
+        
+        webhook_secret = settings.PAYSTACK_WEBHOOK_SECRET
+        computed_signature = hmac.new(
+            webhook_secret.encode('utf-8'),
+            payload,
+            hashlib.sha512
+        ).hexdigest()
+        
+        return hmac.compare_digest(computed_signature, signature)

@@ -1,6 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Product, Order, OrderItem, NewsletterSubscription, Banner, ProductImage, Cart, CartItem
-from django.contrib.auth import get_user_model
+from .models import Category, Product, Order, OrderItem, NewsletterSubscription, Banner, ProductImage, Cart, CartItem, Payment
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
@@ -391,3 +390,46 @@ class UpdateCartItemSerializer(serializers.Serializer):
                 })
         
         return attrs
+    
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = '__all__'
+        read_only_fields = ['payment_reference', 'paystack_reference', 'status', 'created_at', 'updated_at']
+
+class InitializePaymentSerializer(serializers.Serializer):
+    cart_id = serializers.UUIDField()
+    email = serializers.EmailField()
+    callback_url = serializers.URLField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        cart_id = attrs['cart_id']
+        
+        try:
+            cart = Cart.objects.get(id=cart_id)
+        except Cart.DoesNotExist:
+            raise serializers.ValidationError({"cart_id": "Cart not found"})
+        
+        if not cart.items.exists():
+            raise serializers.ValidationError({"cart_id": "Cart is empty"})
+        
+        attrs['cart'] = cart
+        return attrs
+
+class VerifyPaymentSerializer(serializers.Serializer):
+    reference = serializers.CharField(max_length=100)
+
+class CheckoutSerializer(serializers.Serializer):
+    cart_id = serializers.UUIDField()
+    email = serializers.EmailField()
+    customer_name = serializers.CharField(max_length=255)
+    customer_phone = serializers.CharField(max_length=20)
+    address = serializers.JSONField()
+    order_notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_address(self, value):
+        required_fields = ['country', 'street_address', 'town', 'state', 'postal_code']
+        for field in required_fields:
+            if field not in value or not value[field]:
+                raise serializers.ValidationError(f"Address field '{field}' is required")
+        return value

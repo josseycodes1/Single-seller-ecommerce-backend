@@ -16,7 +16,7 @@ from .views import (
         password_resend_code
        
 )
-
+from .views import CheckoutAPIView, InitializePaymentAPIView, VerifyPaymentAPIView, PaymentWebhookAPIView
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet)
 router.register(r'products', ProductViewSet)
@@ -35,18 +35,8 @@ urlpatterns = [
     path("cart/items/", CartItemAPIView.as_view(), name="cart-add-item"),
     path("cart/items/<int:item_id>/", CartItemAPIView.as_view(), name="cart-update-item"),
     path("cart/clear/", ClearCartAPIView.as_view(), name="cart-clear"),
+    path('api/checkout/', CheckoutAPIView.as_view(), name='checkout'),
+    path('api/payment/initialize/', InitializePaymentAPIView.as_view(), name='initialize-payment'),
+    path('api/payment/verify/', VerifyPaymentAPIView.as_view(), name='verify-payment'),
+    path('api/payment/webhook/', PaymentWebhookAPIView.as_view(), name='payment-webhook'),
 ]
-
-# frontend can now fetch:
-# /api/products/ → All products
-# /api/categories/ → All categories
-# /api/orders/ → Orders (brand side)
-# /api/banners/ → Homepage banners
-# /api/newsletter/ → Newsletter subscribers
-
-#test in Postman
-#list all products: GET http://127.0.0.1:8000/api/products/
-#get single product: GET http://127.0.0.1:8000/api/products/1/
-#add new product: POST http://127.0.0.1:8000/api/products/ (send JSON body + image if needed)
-#update product: PUT http://127.0.0.1:8000/api/products/1/
-#delete product: DELETE http://127.0.0.1:8000/api/products/1/
