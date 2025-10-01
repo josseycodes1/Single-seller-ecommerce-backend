@@ -537,27 +537,27 @@ class InitializePaymentAPIView(APIView):
                     "details": f"Amount must be greater than 0, got {total_amount}"
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Generate payment reference
+        
             payment_reference = f"PYMT_{uuid.uuid4().hex[:10].upper()}"
             logger.info(f"Generated payment reference: {payment_reference}")
             
-            # Initialize Paystack service
+      
             paystack_service = PaystackService()
             
-            # Set default callback URL if not provided
+         
             if not callback_url:
                 callback_url = f"{settings.FRONTEND_URL}/payment/verify"
                 logger.info(f"Using default callback URL: {callback_url}")
             
-            # Convert amount to float for Paystack (they expect amount in kobo)
-            amount_in_kobo = float(total_amount) * 100  # Paystack expects amount in kobo
+         
+            amount_in_kobo = float(total_amount) * 100  
             
             logger.info(f"Initializing Paystack payment - Amount: {amount_in_kobo}, Email: {email}, Reference: {payment_reference}")
             
-            # Call Paystack to initialize payment
+           
             paystack_response = paystack_service.initialize_payment(
                 email=email,
-                amount=amount_in_kobo,  # Pass amount in kobo
+                amount=amount_in_kobo,  
                 reference=payment_reference,
                 callback_url=callback_url
             )
@@ -565,9 +565,9 @@ class InitializePaymentAPIView(APIView):
             logger.info(f"Paystack response: {paystack_response}")
             
             if paystack_response.get('status'):
-                # Create payment record
+                
                 payment = Payment.objects.create(
-                    order=None,  # This might be an issue - we need to link to order
+                    order=None,  
                     payment_reference=payment_reference,
                     amount=total_amount,
                     email=email,
