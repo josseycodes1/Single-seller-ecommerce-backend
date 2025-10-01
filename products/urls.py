@@ -35,8 +35,8 @@ urlpatterns = [
     path("cart/items/", CartItemAPIView.as_view(), name="cart-add-item"),
     path("cart/items/<int:item_id>/", CartItemAPIView.as_view(), name="cart-update-item"),
     path("cart/clear/", ClearCartAPIView.as_view(), name="cart-clear"),
-    path('api/checkout/', CheckoutAPIView.as_view(), name='checkout'),
-    path('api/payment/initialize/', InitializePaymentAPIView.as_view(), name='initialize-payment'),
-    path('api/payment/verify/', VerifyPaymentAPIView.as_view(), name='verify-payment'),
-    path('api/payment/webhook/', PaymentWebhookAPIView.as_view(), name='payment-webhook'),
+    path('checkout/', CheckoutAPIView.as_view(), name='checkout'),
+    path('payment/initialize/', InitializePaymentAPIView.as_view(), name='initialize-payment'),
+    path('payment/verify/', VerifyPaymentAPIView.as_view(), name='verify-payment'),
+    path('payment/webhook/', PaymentWebhookAPIView.as_view(), name='payment-webhook'),
 ]
