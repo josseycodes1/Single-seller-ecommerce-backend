@@ -597,26 +597,32 @@ class VerifyPaymentAPIView(APIView):
             return Response({"error": "Payment verification failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class PaymentWebhookAPIView(View):
+    """
+    Handles Paystack webhook events with logging.
+    """
 
     def post(self, request, *args, **kwargs):
-    
+        # Raw body from Paystack
         payload = request.body
 
-      
+        # Log raw payload for debugging
         try:
             logger.info("Paystack webhook payload: %s", payload.decode("utf-8"))
         except Exception:
             logger.error("Unable to decode Paystack payload")
 
+        # Get signature from header
         signature = request.headers.get("x-paystack-signature")
         if not signature:
             logger.warning("Webhook rejected: Missing Paystack signature")
             return JsonResponse({"error": "Missing Paystack signature"}, status=400)
 
+        # Verify signature
         if not self.verify_signature(payload, signature):
             logger.warning("Webhook rejected: Invalid Paystack signature")
             return JsonResponse({"error": "Invalid signature"}, status=400)
 
+        # Parse event data
         try:
             event = json.loads(payload.decode("utf-8"))
         except json.JSONDecodeError:
@@ -628,13 +634,13 @@ class PaymentWebhookAPIView(View):
 
         logger.info("Webhook event received: %s", event_type)
 
-
+        # 🔹 Handle charge.success
         if event_type == "charge.success":
             reference = data.get("reference")
-            amount = data.get("amount", 0) / 100  
+            amount = data.get("amount", 0) / 100  # kobo → naira
 
             payment, created = Payment.objects.get_or_create(
-                reference=reference,
+                payment_reference=reference,
                 defaults={
                     "amount": amount,
                     "status": "success",
@@ -642,7 +648,7 @@ class PaymentWebhookAPIView(View):
                 },
             )
 
-            if not created: 
+            if not created:  # update existing
                 payment.status = "success"
                 payment.payment_method = data.get("channel")
                 payment.save()
@@ -656,7 +662,7 @@ class PaymentWebhookAPIView(View):
                 "payment_method": data.get("channel")
             }, status=200)
 
-   
+        # 🔹 Handle other events if needed
         logger.info("Unhandled Paystack event type: %s", event_type)
         return JsonResponse({
             "status": "ignored",
@@ -666,66 +672,6 @@ class PaymentWebhookAPIView(View):
     def verify_signature(self, payload, signature):
         """
         Verify Paystack webhook signature using secret key.
-        """
-        secret = settings.PAYSTACK_SECRET_KEY.encode("utf-8")
-
-        computed_signature = hmac.new(
-            secret, payload, hashlib.sha512
-        ).hexdigest()
-
-        return hmac.compare_digest(computed_signature, signature)
-    """
-    Handles Paystack webhook events.
-    """
-
-    def post(self, request, *args, **kwargs):
-        payload = request.body
-
-      
-        signature = request.headers.get("x-paystack-signature")
-
-        if not signature:
-            return JsonResponse({"error": "Missing Paystack signature"}, status=400)
-
-        if not self.verify_signature(payload, signature):
-            return JsonResponse({"error": "Invalid signature"}, status=400)
-
-     
-        try:
-            event = json.loads(payload.decode("utf-8"))
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON"}, status=400)
-
-        event_type = event.get("event")
-        data = event.get("data", {})
-
-       
-        if event_type == "charge.success":
-            reference = data.get("reference")
-            amount = data.get("amount", 0) / 100 
-
-            payment, created = Payment.objects.get_or_create(
-                reference=reference,
-                defaults={
-                    "amount": amount,
-                    "status": "success",
-                    "payment_method": data.get("channel"),
-                },
-            )
-
-            if not created:  
-                payment.status = "success"
-                payment.payment_method = data.get("channel")
-                payment.save()
-
-            return JsonResponse({"status": "success"}, status=200)
-
-       
-        return JsonResponse({"status": "ignored", "event": event_type}, status=200)
-
-    def verify_signature(self, payload, signature):
-        """
-        Verify Paystack webhook signature using your secret key.
         """
         secret = settings.PAYSTACK_SECRET_KEY.encode("utf-8")
 
