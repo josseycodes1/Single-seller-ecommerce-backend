@@ -510,65 +510,116 @@ class InitializePaymentAPIView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
-        serializer = InitializePaymentSerializer(data=request.data)
-        if serializer.is_valid():
-            try:
-                cart = serializer.validated_data['cart']
-                email = serializer.validated_data['email']
-                callback_url = serializer.validated_data.get('callback_url')
-                
-                total_amount = cart.get_total_price()
-                
-                if total_amount <= 0:
-                    return Response({"error": "Invalid order amount"}, status=status.HTTP_400_BAD_REQUEST)
-                
-              
-                payment_reference = f"PYMT_{uuid.uuid4().hex[:10].upper()}"
-                
-              
-                paystack_service = PaystackService()
-                
-               
-                if not callback_url:
-                    callback_url = f"{settings.FRONTEND_URL}/payment/verify"
-                
-                paystack_response = paystack_service.initialize_payment(
-                    email=email,
-                    amount=float(total_amount),
-                    reference=payment_reference,
-                    callback_url=callback_url
-                )
-                
-                if paystack_response.get('status'):
-               
-                    payment = Payment.objects.create(
-                        order=None,  
-                        payment_reference=payment_reference,
-                        amount=total_amount,
-                        email=email,
-                        status='pending'
-                    )
-                    
-                    return Response({
-                        "success": True,
-                        "authorization_url": paystack_response['data']['authorization_url'],
-                        "access_code": paystack_response['data']['access_code'],
-                        "reference": payment_reference,
-                        "amount": float(total_amount),
-                        "email": email,
-                        "callback_url": callback_url
-                    }, status=status.HTTP_200_OK)
-                else:
-                    return Response({
-                        "error": "Failed to initialize payment",
-                        "details": paystack_response.get('message', 'Unknown error')
-                    }, status=status.HTTP_400_BAD_REQUEST)
-                
-            except Exception as e:
-                logger.error(f"Payment initialization error: {str(e)}")
-                return Response({"error": "Payment initialization failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.info(f"InitializePaymentAPIView called with data: {request.data}")
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = InitializePaymentSerializer(data=request.data)
+        if not serializer.is_valid():
+            logger.error(f"Serializer validation failed: {serializer.errors}")
+            return Response({
+                "error": "Validation failed",
+                "details": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            cart = serializer.validated_data['cart']
+            email = serializer.validated_data['email']
+            callback_url = serializer.validated_data.get('callback_url')
+            
+            logger.info(f"Processing payment for cart: {cart.id}, email: {email}")
+            
+            total_amount = cart.get_total_price()
+            logger.info(f"Cart total amount: {total_amount}")
+            
+            if total_amount <= 0:
+                logger.error(f"Invalid total amount: {total_amount}")
+                return Response({
+                    "error": "Invalid order amount",
+                    "details": f"Amount must be greater than 0, got {total_amount}"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Generate payment reference
+            payment_reference = f"PYMT_{uuid.uuid4().hex[:10].upper()}"
+            logger.info(f"Generated payment reference: {payment_reference}")
+            
+            # Initialize Paystack service
+            paystack_service = PaystackService()
+            
+            # Set default callback URL if not provided
+            if not callback_url:
+                callback_url = f"{settings.FRONTEND_URL}/payment/verify"
+                logger.info(f"Using default callback URL: {callback_url}")
+            
+            # Convert amount to float for Paystack (they expect amount in kobo)
+            amount_in_kobo = float(total_amount) * 100  # Paystack expects amount in kobo
+            
+            logger.info(f"Initializing Paystack payment - Amount: {amount_in_kobo}, Email: {email}, Reference: {payment_reference}")
+            
+            # Call Paystack to initialize payment
+            paystack_response = paystack_service.initialize_payment(
+                email=email,
+                amount=amount_in_kobo,  # Pass amount in kobo
+                reference=payment_reference,
+                callback_url=callback_url
+            )
+            
+            logger.info(f"Paystack response: {paystack_response}")
+            
+            if paystack_response.get('status'):
+                # Create payment record
+                payment = Payment.objects.create(
+                    order=None,  # This might be an issue - we need to link to order
+                    payment_reference=payment_reference,
+                    amount=total_amount,
+                    email=email,
+                    status='pending'
+                )
+                logger.info(f"Payment record created: {payment.id}")
+                
+                return Response({
+                    "success": True,
+                    "authorization_url": paystack_response['data']['authorization_url'],
+                    "access_code": paystack_response['data']['access_code'],
+                    "reference": payment_reference,
+                    "amount": float(total_amount),
+                    "email": email,
+                    "callback_url": callback_url
+                }, status=status.HTTP_200_OK)
+            else:
+                logger.error(f"Paystack initialization failed: {paystack_response}")
+                return Response({
+                    "error": "Failed to initialize payment with Paystack",
+                    "details": paystack_response.get('message', 'Unknown Paystack error'),
+                    "paystack_response": paystack_response
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Cart.DoesNotExist as e:
+            logger.error(f"Cart not found: {str(e)}")
+            return Response({
+                "error": "Cart not found",
+                "details": str(e)
+            }, status=status.HTTP_404_NOT_FOUND)
+            
+        except KeyError as e:
+            logger.error(f"Missing key in data: {str(e)}")
+            return Response({
+                "error": "Missing required data",
+                "details": f"Missing key: {str(e)}"
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except ValueError as e:
+            logger.error(f"Value error: {str(e)}")
+            return Response({
+                "error": "Invalid data format",
+                "details": str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            logger.error(f"Payment initialization error: {str(e)}", exc_info=True)
+            return Response({
+                "error": "Payment initialization failed",
+                "details": str(e),
+                "type": type(e).__name__
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VerifyPaymentAPIView(APIView):
     permission_classes = [AllowAny]
