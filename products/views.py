@@ -510,70 +510,71 @@ class InitializePaymentAPIView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
-        logger.info(f"InitializePaymentAPIView called with data: {request.data}")
+        print("DEBUG: InitializePaymentAPIView called")
+        print(f"DEBUG: Request data: {request.data}")
         
         serializer = InitializePaymentSerializer(data=request.data)
         if not serializer.is_valid():
-            logger.error(f"Serializer validation failed: {serializer.errors}")
+            print(f"DEBUG: Serializer validation failed: {serializer.errors}")
             return Response({
                 "error": "Validation failed",
                 "details": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
+        
+        print("DEBUG: Serializer is valid")
         
         try:
             cart = serializer.validated_data['cart']
             email = serializer.validated_data['email']
             callback_url = serializer.validated_data.get('callback_url')
             
-            logger.info(f"Processing payment for cart: {cart.id}, email: {email}")
+            print(f"DEBUG: Cart ID: {cart.id}, Email: {email}")
             
             total_amount = cart.get_total_price()
-            logger.info(f"Cart total amount: {total_amount}")
+            print(f"DEBUG: Total amount: {total_amount}")
             
             if total_amount <= 0:
-                logger.error(f"Invalid total amount: {total_amount}")
+                print(f"❌ DEBUG: Invalid amount: {total_amount}")
                 return Response({
                     "error": "Invalid order amount",
                     "details": f"Amount must be greater than 0, got {total_amount}"
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-        
             payment_reference = f"PYMT_{uuid.uuid4().hex[:10].upper()}"
-            logger.info(f"Generated payment reference: {payment_reference}")
+            print(f"DEBUG: Payment reference: {payment_reference}")
             
-      
+            # Test Paystack service creation
+            print("DEBUG: Creating PaystackService instance...")
             paystack_service = PaystackService()
+            print("DEBUG: PaystackService instance created")
             
-         
             if not callback_url:
                 callback_url = f"{settings.FRONTEND_URL}/payment/verify"
-                logger.info(f"Using default callback URL: {callback_url}")
+                print(f"🔍 DEBUG: Using callback URL: {callback_url}")
             
-         
-            amount_in_kobo = float(total_amount) * 100  
+            amount_in_kobo = float(total_amount) * 100
+            print(f"DEBUG: Amount in kobo: {amount_in_kobo}")
             
-            logger.info(f"Initializing Paystack payment - Amount: {amount_in_kobo}, Email: {email}, Reference: {payment_reference}")
-            
-           
+            print("DEBUG: Calling Paystack initialize_payment...")
             paystack_response = paystack_service.initialize_payment(
                 email=email,
-                amount=amount_in_kobo,  
+                amount=amount_in_kobo,
                 reference=payment_reference,
                 callback_url=callback_url
             )
             
-            logger.info(f"Paystack response: {paystack_response}")
+            print(f"DEBUG: Paystack response received: {paystack_response}")
             
             if paystack_response.get('status'):
-                
+                print("🔍 DEBUG: Creating payment record...")
                 payment = Payment.objects.create(
-                    order=None,  
+                    order=None,
                     payment_reference=payment_reference,
                     amount=total_amount,
                     email=email,
                     status='pending'
                 )
-                logger.info(f"Payment record created: {payment.id}")
+                print(f"DEBUG: Payment record created with ID: {payment.id}")
                 
                 return Response({
                     "success": True,
@@ -585,40 +586,25 @@ class InitializePaymentAPIView(APIView):
                     "callback_url": callback_url
                 }, status=status.HTTP_200_OK)
             else:
-                logger.error(f"Paystack initialization failed: {paystack_response}")
+                print(f"DEBUG: Paystack failed: {paystack_response}")
                 return Response({
                     "error": "Failed to initialize payment with Paystack",
                     "details": paystack_response.get('message', 'Unknown Paystack error'),
                     "paystack_response": paystack_response
                 }, status=status.HTTP_400_BAD_REQUEST)
                 
-        except Cart.DoesNotExist as e:
-            logger.error(f"Cart not found: {str(e)}")
-            return Response({
-                "error": "Cart not found",
-                "details": str(e)
-            }, status=status.HTTP_404_NOT_FOUND)
-            
-        except KeyError as e:
-            logger.error(f"Missing key in data: {str(e)}")
-            return Response({
-                "error": "Missing required data",
-                "details": f"Missing key: {str(e)}"
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
-        except ValueError as e:
-            logger.error(f"Value error: {str(e)}")
-            return Response({
-                "error": "Invalid data format",
-                "details": str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
         except Exception as e:
+            print(f"DEBUG: EXCEPTION CAUGHT: {str(e)}")
+            print(f"DEBUG: Exception type: {type(e).__name__}")
+            import traceback
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
+            
             logger.error(f"Payment initialization error: {str(e)}", exc_info=True)
             return Response({
                 "error": "Payment initialization failed",
                 "details": str(e),
-                "type": type(e).__name__
+                "type": type(e).__name__,
+                "traceback": traceback.format_exc()  # Include in response for debugging
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VerifyPaymentAPIView(APIView):
