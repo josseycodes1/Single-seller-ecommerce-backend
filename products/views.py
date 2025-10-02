@@ -517,6 +517,7 @@ class InitializePaymentAPIView(APIView):
         if not serializer.is_valid():
             print(f"DEBUG: Serializer validation failed: {serializer.errors}")
             return Response({
+                
                 "error": "Validation failed",
                 "details": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -760,6 +761,7 @@ class PaymentWebhookAPIView(View):
         return hmac.compare_digest(computed_signature, signature)
 class OrderListAPIView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = [] 
     
     def get(self, request):
         email = request.GET.get('email')
@@ -823,4 +825,80 @@ class OrderListAPIView(APIView):
             
         except Exception as e:
             logger.error(f"Error fetching orders: {str(e)}")
+            return Response({"error": "Failed to fetch orders"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class GuestOrderListAPIView(APIView):
+    """
+    Special endpoint for guest users to access their orders by email
+    Completely bypasses any authentication
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []  # Important: Disable all authentication
+    
+    def get(self, request):
+        print("DEBUG: GuestOrderListAPIView called")
+        email = request.GET.get('email')
+        
+        print(f"DEBUG: Email parameter: {email}")
+        
+        if not email:
+            print("DEBUG: No email provided")
+            return Response({"error": "Email parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            print(f"DEBUG: Searching for orders with email: {email}")
+            orders = Order.objects.filter(customer_email=email).order_by('-created_at')
+            print(f"DEBUG: Found {orders.count()} orders")
+            
+            orders_data = []
+            for order in orders:
+                order_data = {
+                    'id': order.id,
+                    'customer_name': order.customer_name,
+                    'customer_email': order.customer_email,
+                    'customer_phone': str(order.customer_phone) if order.customer_phone else '',
+                    'status': order.status,
+                    'total_amount': float(order.total_amount),
+                    'created_at': order.created_at,
+                    'is_paid': order.is_paid,
+                    'payment_status': order.payment_status,
+                    'order_notes': order.order_notes,
+                    'items': []
+                }
+                
+                for item in order.items.all():
+                    order_data['items'].append({
+                        'id': item.id,
+                        'product': {
+                            'id': item.product.id,
+                            'name': item.product.name,
+                            'price': float(item.product.price),
+                            'images': [
+                                {
+                                    'image_url': image.image.url if image.image else None
+                                } for image in item.product.images.all()
+                            ]
+                        },
+                        'quantity': item.quantity,
+                        'price': float(item.price),
+                        'color': item.color
+                    })
+                
+                if order.address:
+                    order_data['address'] = {
+                        'street_address': order.address.street_address,
+                        'town': order.address.town,
+                        'state': order.address.state,
+                        'country': order.address.country,
+                        'postal_code': order.address.postal_code
+                    }
+                
+                orders_data.append(order_data)
+            
+            print(f"DEBUG: Returning {len(orders_data)} orders")
+            return Response(orders_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"DEBUG: Error fetching guest orders: {str(e)}")
+            logger.error(f"Error fetching guest orders: {str(e)}", exc_info=True)
             return Response({"error": "Failed to fetch orders"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
