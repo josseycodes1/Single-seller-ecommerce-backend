@@ -525,16 +525,17 @@ class InitializePaymentAPIView(APIView):
         
         try:
             cart = serializer.validated_data['cart']
+            order = serializer.validated_data['order']  
             email = serializer.validated_data['email']
             callback_url = serializer.validated_data.get('callback_url')
             
-            print(f"DEBUG: Cart ID: {cart.id}, Email: {email}")
+            print(f"DEBUG: Cart ID: {cart.id}, Order ID: {order.id}, Email: {email}")
             
             total_amount = cart.get_total_price()
             print(f"DEBUG: Total amount: {total_amount}")
             
             if total_amount <= 0:
-                print(f"❌ DEBUG: Invalid amount: {total_amount}")
+                print(f"DEBUG: Invalid amount: {total_amount}")
                 return Response({
                     "error": "Invalid order amount",
                     "details": f"Amount must be greater than 0, got {total_amount}"
@@ -543,14 +544,13 @@ class InitializePaymentAPIView(APIView):
             payment_reference = f"PYMT_{uuid.uuid4().hex[:10].upper()}"
             print(f"DEBUG: Payment reference: {payment_reference}")
             
-            # Test Paystack service creation
             print("DEBUG: Creating PaystackService instance...")
             paystack_service = PaystackService()
             print("DEBUG: PaystackService instance created")
             
             if not callback_url:
                 callback_url = f"{settings.FRONTEND_URL}/payment/verify"
-                print(f"🔍 DEBUG: Using callback URL: {callback_url}")
+                print(f"DEBUG: Using callback URL: {callback_url}")
             
             amount_in_kobo = float(total_amount) * 100
             print(f"DEBUG: Amount in kobo: {amount_in_kobo}")
@@ -566,9 +566,9 @@ class InitializePaymentAPIView(APIView):
             print(f"DEBUG: Paystack response received: {paystack_response}")
             
             if paystack_response.get('status'):
-                print("🔍 DEBUG: Creating payment record...")
+                print("DEBUG: Creating payment record...")
                 payment = Payment.objects.create(
-                    order=None,
+                    order=order,  
                     payment_reference=payment_reference,
                     amount=total_amount,
                     email=email,
@@ -604,9 +604,8 @@ class InitializePaymentAPIView(APIView):
                 "error": "Payment initialization failed",
                 "details": str(e),
                 "type": type(e).__name__,
-                "traceback": traceback.format_exc()  # Include in response for debugging
+                "traceback": traceback.format_exc()
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 class VerifyPaymentAPIView(APIView):
     permission_classes = [AllowAny]
     
