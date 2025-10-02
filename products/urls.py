@@ -40,5 +40,5 @@ urlpatterns = [
     path('payment/initialize/', InitializePaymentAPIView.as_view(), name='initialize-payment'),
     path('payment/verify/', VerifyPaymentAPIView.as_view(), name='verify-payment'),
     path('payment/webhook/', PaymentWebhookAPIView.as_view(), name='payment-webhook'),
-    path('api/orders/', OrderListAPIView.as_view(), name='order-list'),
+    path('orders/', OrderListAPIView.as_view(), name='order-list'),
 ]
