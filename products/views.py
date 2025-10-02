@@ -630,7 +630,11 @@ class VerifyPaymentAPIView(APIView):
                         payment.paystack_reference = data.get('reference')
                         payment.save()
                         
-
+                       
+                        if payment.order:
+                            payment.order.is_paid = True
+                            payment.order.payment_status = 'success'
+                            payment.order.save()
                         
                         return Response({
                             "success": True,
@@ -641,7 +645,8 @@ class VerifyPaymentAPIView(APIView):
                                 "amount": float(payment.amount),
                                 "email": payment.email,
                                 "paid_at": data.get('paid_at')
-                            }
+                            },
+                            "order_id": payment.order.id if payment.order else None
                         })
                     else:
                         payment.status = 'failed'
@@ -666,10 +671,6 @@ class VerifyPaymentAPIView(APIView):
             return Response({"error": "Payment verification failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class PaymentWebhookAPIView(View):
-    """
-    Handles Paystack webhook events with logging.
-    """
-
     def post(self, request, *args, **kwargs):
       
         payload = request.body
@@ -708,22 +709,30 @@ class PaymentWebhookAPIView(View):
             reference = data.get("reference")
             amount = data.get("amount", 0) / 100 
 
-            payment, created = Payment.objects.get_or_create(
-                payment_reference=reference,
-                defaults={
-                    "amount": amount,
-                    "status": "success",
-                    "payment_method": data.get("channel"),
-                },
-            )
-
-            if not created: 
+            try:
+                payment = Payment.objects.get(payment_reference=reference)
                 payment.status = "success"
+                payment.paystack_reference = data.get("reference")
                 payment.payment_method = data.get("channel")
                 payment.save()
+                
+              
+                if payment.order:
+                    payment.order.is_paid = True
+                    payment.order.payment_status = 'success'
+                    payment.order.save()
+                    
+            except Payment.DoesNotExist:
+               
+                payment = Payment.objects.create(
+                    payment_reference=reference,
+                    amount=amount,
+                    status="success",
+                    payment_method=data.get("channel"),
+                    email=data.get('customer', {}).get('email', '')
+                )
 
             logger.info("Payment processed successfully: %s", reference)
-
             return JsonResponse({
                 "status": "success",
                 "reference": reference,
@@ -749,3 +758,69 @@ class PaymentWebhookAPIView(View):
         ).hexdigest()
 
         return hmac.compare_digest(computed_signature, signature)
+class OrderListAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        email = request.GET.get('email')
+        
+        if not email:
+            return Response({"error": "Email parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+          
+            orders = Order.objects.filter(customer_email=email).order_by('-created_at')
+            
+          
+            orders_data = []
+            for order in orders:
+                order_data = {
+                    'id': order.id,
+                    'customer_name': order.customer_name,
+                    'customer_email': order.customer_email,
+                    'customer_phone': str(order.customer_phone) if order.customer_phone else '',
+                    'status': order.status,
+                    'total_amount': float(order.total_amount),
+                    'created_at': order.created_at,
+                    'is_paid': order.is_paid,
+                    'payment_status': order.payment_status,
+                    'order_notes': order.order_notes,
+                    'items': []
+                }
+                
+              
+                for item in order.items.all():
+                    order_data['items'].append({
+                        'id': item.id,
+                        'product': {
+                            'id': item.product.id,
+                            'name': item.product.name,
+                            'price': float(item.product.price),
+                            'images': [
+                                {
+                                    'image_url': image.image.url if image.image else None
+                                } for image in item.product.images.all()
+                            ]
+                        },
+                        'quantity': item.quantity,
+                        'price': float(item.price),
+                        'color': item.color
+                    })
+                
+               
+                if order.address:
+                    order_data['address'] = {
+                        'street_address': order.address.street_address,
+                        'town': order.address.town,
+                        'state': order.address.state,
+                        'country': order.address.country,
+                        'postal_code': order.address.postal_code
+                    }
+                
+                orders_data.append(order_data)
+            
+            return Response(orders_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching orders: {str(e)}")
+            return Response({"error": "Failed to fetch orders"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
