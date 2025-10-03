@@ -135,8 +135,15 @@ class ProductViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "description"]  
     ordering_fields = ["price", "created_at"] 
-    permission_classes = [IsAuthenticated] 
     
+    #allow public access for listing and retrieving products
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [AllowAny]
+        else:
+            #require authentication for create, update, delete
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -163,6 +170,28 @@ class ProductViewSet(viewsets.ModelViewSet):
                 {"error": "Something went wrong. Check server logs."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+            
+    def get_queryset(self):
+        queryset = Product.objects.all()
+        
+        # Handle is_featured filter
+        is_featured = self.request.query_params.get('is_featured')
+        if is_featured is not None:
+            if is_featured.lower() == 'true':
+                queryset = queryset.filter(is_featured=True)
+            elif is_featured.lower() == 'false':
+                queryset = queryset.filter(is_featured=False)
+        
+        # Handle limit parameter
+        limit = self.request.query_params.get('limit')
+        if limit is not None:
+            try:
+                queryset = queryset[:int(limit)]
+            except ValueError:
+                pass  # Ignore invalid limit values
+        
+        return queryset
+
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
