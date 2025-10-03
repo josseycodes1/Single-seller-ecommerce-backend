@@ -108,62 +108,67 @@ class PaystackService:
                 
         return sanitized
     
-    def initialize_payment(self, email, amount, reference, callback_url=None):
-        """Initialize payment with Paystack"""
-        logger.info(f"Initializing payment - Email: {email}, Amount: {amount}, Reference: {reference}")
-        
-        # Validate inputs
-        if not email or not isinstance(email, str) or "@" not in email:
-            raise ValidationError("Valid email is required for payment")
-        
-        if not amount or amount <= 0:
-            raise ValidationError("Payment amount must be greater than 0")
-        
-        if not reference or not isinstance(reference, str):
-            raise ValidationError("Valid payment reference is required")
-        
-        try:
-            amount_in_kobo = int(amount * 100)  # Convert to kobo
-            if amount_in_kobo < 100:  # Paystack minimum amount
-                raise ValidationError("Payment amount is too small")
+    def initialize_payment(self, email, amount, reference, callback_url=None, metadata=None):
+            """Initialize payment with Paystack"""
+            logger.info(f"Initializing payment - Email: {email}, Amount: {amount}, Reference: {reference}")
+            
+            # Validate inputs
+            if not email or not isinstance(email, str) or "@" not in email:
+                raise ValidationError("Valid email is required for payment")
+            
+            if not amount or amount <= 0:
+                raise ValidationError("Payment amount must be greater than 0")
+            
+            if not reference or not isinstance(reference, str):
+                raise ValidationError("Valid payment reference is required")
+            
+            try:
+                amount_in_kobo = int(amount * 100)  # Convert to kobo
+                if amount_in_kobo < 100:  # Paystack minimum amount
+                    raise ValidationError("Payment amount is too small")
+                    
+            except (ValueError, TypeError) as e:
+                raise ValidationError(f"Invalid amount format: {amount}")
+            
+            data = {
+                "email": email,
+                "amount": amount_in_kobo,
+                "reference": reference,
+                "currency": "NGN"
+            }
+            
+            # Add callback URL if provided
+            if callback_url:
+                data["callback_url"] = callback_url
+                logger.info(f"Using callback URL: {callback_url}")
+            
+            # ✅ ADD METADATA IF PROVIDED
+            if metadata:
+                data["metadata"] = metadata
+                logger.info(f"Added metadata to payment: {self._sanitize_data(metadata)}")
+            
+            try:
+                response = self._make_request("POST", "/transaction/initialize", data)
                 
-        except (ValueError, TypeError) as e:
-            raise ValidationError(f"Invalid amount format: {amount}")
-        
-        data = {
-            "email": email,
-            "amount": amount_in_kobo,
-            "reference": reference,
-            "currency": "NGN"
-        }
-        
-        # Add callback URL if provided
-        if callback_url:
-            data["callback_url"] = callback_url
-            logger.info(f"Using callback URL: {callback_url}")
-        
-        try:
-            response = self._make_request("POST", "/transaction/initialize", data)
-            
-            # Validate response structure
-            if not response.get('status'):
-                error_msg = response.get('message', 'Unknown Paystack error')
-                logger.error(f"Paystack initialization failed: {error_msg}")
-                raise ValidationError(f"Payment initialization failed: {error_msg}")
-            
-            if not response.get('data') or not response['data'].get('authorization_url'):
-                logger.error(f"Invalid Paystack response structure: {response}")
-                raise ValidationError("Invalid response from payment service")
-            
-            logger.info(f"Payment initialized successfully - Reference: {reference}")
-            return response
-            
-        except ValidationError:
-            # Re-raise ValidationErrors
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error in payment initialization: {str(e)}", exc_info=True)
-            raise ValidationError("Failed to initialize payment")
+                # Validate response structure
+                if not response.get('status'):
+                    error_msg = response.get('message', 'Unknown Paystack error')
+                    logger.error(f"Paystack initialization failed: {error_msg}")
+                    raise ValidationError(f"Payment initialization failed: {error_msg}")
+                
+                if not response.get('data') or not response['data'].get('authorization_url'):
+                    logger.error(f"Invalid Paystack response structure: {response}")
+                    raise ValidationError("Invalid response from payment service")
+                
+                logger.info(f"Payment initialized successfully - Reference: {reference}")
+                return response
+                
+            except ValidationError:
+                # Re-raise ValidationErrors
+                raise
+            except Exception as e:
+                logger.error(f"Unexpected error in payment initialization: {str(e)}", exc_info=True)
+                raise ValidationError("Failed to initialize payment")
     
     def verify_payment(self, reference):
         """Verify payment status with Paystack"""
