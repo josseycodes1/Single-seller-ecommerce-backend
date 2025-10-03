@@ -517,7 +517,6 @@ class InitializePaymentAPIView(APIView):
         if not serializer.is_valid():
             print(f"DEBUG: Serializer validation failed: {serializer.errors}")
             return Response({
-                
                 "error": "Validation failed",
                 "details": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -556,12 +555,40 @@ class InitializePaymentAPIView(APIView):
             amount_in_kobo = float(total_amount) * 100
             print(f"DEBUG: Amount in kobo: {amount_in_kobo}")
             
+            order_items = []
+            for item in cart.items.all():
+                order_items.append(f"{item.product.name} (x{item.quantity}) - ₦{item.product.price}")
+            
+            metadata = {
+                "order_id": order.id,
+                "customer_name": order.customer_name,
+                "items_count": cart.items.count(),
+                "custom_fields": [
+                    {
+                        "display_name": "Order Items",
+                        "variable_name": "order_items", 
+                        "value": "; ".join(order_items)
+                    },
+                    {
+                        "display_name": "Shipping Address",
+                        "variable_name": "shipping_address",
+                        "value": f"{order.address.street_address}, {order.address.town}, {order.address.state}"
+                    },
+                    {
+                        "display_name": "Order Notes", 
+                        "variable_name": "order_notes",
+                        "value": order.order_notes or "No special instructions"
+                    }
+                ]
+            }
+            
             print("DEBUG: Calling Paystack initialize_payment...")
             paystack_response = paystack_service.initialize_payment(
                 email=email,
                 amount=amount_in_kobo,
                 reference=payment_reference,
-                callback_url=callback_url
+                callback_url=callback_url,
+                metadata=metadata 
             )
             
             print(f"DEBUG: Paystack response received: {paystack_response}")
@@ -607,6 +634,7 @@ class InitializePaymentAPIView(APIView):
                 "type": type(e).__name__,
                 "traceback": traceback.format_exc()
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class VerifyPaymentAPIView(APIView):
     permission_classes = [AllowAny]
     
