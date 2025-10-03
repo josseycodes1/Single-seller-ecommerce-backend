@@ -100,6 +100,7 @@ class PasswordResendCodeSerializer(serializers.Serializer):
         return reset_code, email
 
 User = get_user_model()
+
 class SellerRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,
@@ -151,6 +152,7 @@ class SellerRegisterSerializer(serializers.ModelSerializer):
             first_name=validated_data.get("first_name", ""),
             last_name=validated_data.get("last_name", ""),
             business_name=validated_data.get("business_name", ""),
+            is_seller=True
         )
         user.is_seller = True
         user.is_customer = False

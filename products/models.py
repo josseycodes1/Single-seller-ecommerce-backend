@@ -36,7 +36,7 @@ class User(AbstractUser):
     state = models.CharField(max_length=255, blank=True) 
     postal_code = models.CharField(max_length=20, blank=True) 
     phone_number = PhoneNumberField(blank=True, null=True, region="NG")
-    is_seller = models.BooleanField(default=False)
+    is_seller = models.BooleanField(default=True)
     is_customer = models.BooleanField(default=True)
     reset_code = models.CharField(max_length=6, blank=True, null=True)
     reset_code_expires = models.DateTimeField(blank=True, null=True)
