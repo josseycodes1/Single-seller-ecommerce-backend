@@ -127,7 +127,20 @@ class SellerRegisterView(generics.CreateAPIView):
 
 class IsSeller(BasePermission):
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.is_seller
+        print(f"DEBUG IsSeller: User authenticated: {request.user.is_authenticated}")
+        if not request.user.is_authenticated:
+            print("DEBUG IsSeller: User not authenticated")
+            return False
+        
+        print(f"DEBUG IsSeller: User is_seller value: {request.user.is_seller}")
+        print(f"DEBUG IsSeller: User email: {request.user.email}")
+        
+        
+        if hasattr(request.user, 'is_seller'):
+            return request.user.is_seller
+        
+        print("DEBUG IsSeller: User has no is_seller attribute")
+        return False
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
@@ -141,8 +154,17 @@ class ProductViewSet(viewsets.ModelViewSet):
     ordering_fields = ["price", "created_at"] 
     
     def get_permissions(self):
+        print(f"DEBUG: Action: {self.action}")
+        print(f"DEBUG: User: {self.request.user}")
+        print(f"DEBUG: Is authenticated: {self.request.user.is_authenticated}")
+        if self.request.user.is_authenticated:
+            print(f"DEBUG: Is seller: {self.request.user.is_seller}")
+            print(f"DEBUG: User email: {self.request.user.email}")
+        
         if self.action in ["create", "update", "partial_update", "destroy"]:
+            print("DEBUG: Using IsSeller permission")
             return [IsSeller()]
+        print("DEBUG: No permission required")
         return []
 
     def get_serializer_context(self):
@@ -151,6 +173,11 @@ class ProductViewSet(viewsets.ModelViewSet):
         return context
 
     def create(self, request, *args, **kwargs):
+        print(f"DEBUG: Create method - User: {request.user}")
+        print(f"DEBUG: User is authenticated: {request.user.is_authenticated}")
+        if request.user.is_authenticated:
+            print(f"DEBUG: User is seller: {request.user.is_seller}")
+        
         try:
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
