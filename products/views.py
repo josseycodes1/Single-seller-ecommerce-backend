@@ -777,9 +777,7 @@ class PaymentWebhookAPIView(View):
         }, status=200)
 
     def verify_signature(self, payload, signature):
-        """
-        Verify Paystack webhook signature using secret key.
-        """
+       
         secret = settings.PAYSTACK_SECRET_KEY.encode("utf-8")
 
         computed_signature = hmac.new(
@@ -856,12 +854,9 @@ class OrderListAPIView(APIView):
             return Response({"error": "Failed to fetch orders"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 class GuestOrderListAPIView(APIView):
-    """
-    Special endpoint for guest users to access their orders by email
-    Completely bypasses any authentication
-    """
+    
     permission_classes = [AllowAny]
-    authentication_classes = []  # Important: Disable all authentication
+    authentication_classes = [] 
     
     def get(self, request):
         print("DEBUG: GuestOrderListAPIView called")

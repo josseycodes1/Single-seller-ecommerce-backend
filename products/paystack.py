@@ -12,7 +12,7 @@ class PaystackService:
         self.public_key = settings.PAYSTACK_PUBLIC_KEY
         self.base_url = "https://api.paystack.co"
         
-        # Validate that keys are set
+ 
         if not self.secret_key:
             logger.error("PAYSTACK_SECRET_KEY is not configured in settings")
             raise ValidationError("Paystack secret key is not configured")
@@ -39,10 +39,10 @@ class PaystackService:
                 logger.error(error_msg)
                 raise ValidationError(error_msg)
             
-            # Log response status
+          
             logger.info(f"Paystack API Response Status: {response.status_code}")
             
-            # Try to parse JSON response
+          
             try:
                 response_data = response.json()
                 logger.debug(f"Paystack API Response: {response_data}")
@@ -50,7 +50,7 @@ class PaystackService:
                 logger.error(f"Failed to parse Paystack JSON response: {e}")
                 raise ValidationError(f"Invalid response from payment service: {response.text}")
             
-            # Check for HTTP errors
+         
             response.raise_for_status()
             
             return response_data
@@ -69,11 +69,11 @@ class PaystackService:
             error_msg = f"Paystack API HTTP error {response.status_code}: {str(e)}"
             logger.error(error_msg)
             
-            # Provide more specific error messages based on status code
+          
             if response.status_code == 401:
                 raise ValidationError("Payment service authentication failed")
             elif response.status_code == 400:
-                # Try to get error details from response
+             
                 try:
                     error_detail = response.json().get('message', 'Invalid request')
                     raise ValidationError(f"Payment request failed: {error_detail}")
@@ -97,10 +97,10 @@ class PaystackService:
             raise ValidationError(f"Unexpected payment service error")
     
     def _sanitize_data(self, data):
-        """Sanitize sensitive data for logging"""
+       
         sanitized = data.copy()
         
-        # Remove or mask sensitive fields
+ 
         sensitive_fields = ['authorization_code', 'bin', 'last4', 'authorization_url']
         for field in sensitive_fields:
             if field in sanitized:
@@ -109,10 +109,10 @@ class PaystackService:
         return sanitized
     
     def initialize_payment(self, email, amount, reference, callback_url=None, metadata=None):
-            """Initialize payment with Paystack"""
+         
             logger.info(f"Initializing payment - Email: {email}, Amount: {amount}, Reference: {reference}")
             
-            # Validate inputs
+           
             if not email or not isinstance(email, str) or "@" not in email:
                 raise ValidationError("Valid email is required for payment")
             
@@ -123,8 +123,8 @@ class PaystackService:
                 raise ValidationError("Valid payment reference is required")
             
             try:
-                amount_in_kobo = int(amount * 100)  # Convert to kobo
-                if amount_in_kobo < 100:  # Paystack minimum amount
+                amount_in_kobo = int(amount * 100) 
+                if amount_in_kobo < 100:  
                     raise ValidationError("Payment amount is too small")
                     
             except (ValueError, TypeError) as e:
@@ -136,13 +136,12 @@ class PaystackService:
                 "reference": reference,
                 "currency": "NGN"
             }
-            
-            # Add callback URL if provided
+           
             if callback_url:
                 data["callback_url"] = callback_url
                 logger.info(f"Using callback URL: {callback_url}")
             
-            # ✅ ADD METADATA IF PROVIDED
+      
             if metadata:
                 data["metadata"] = metadata
                 logger.info(f"Added metadata to payment: {self._sanitize_data(metadata)}")
@@ -150,7 +149,7 @@ class PaystackService:
             try:
                 response = self._make_request("POST", "/transaction/initialize", data)
                 
-                # Validate response structure
+      
                 if not response.get('status'):
                     error_msg = response.get('message', 'Unknown Paystack error')
                     logger.error(f"Paystack initialization failed: {error_msg}")
@@ -164,14 +163,14 @@ class PaystackService:
                 return response
                 
             except ValidationError:
-                # Re-raise ValidationErrors
+            
                 raise
             except Exception as e:
                 logger.error(f"Unexpected error in payment initialization: {str(e)}", exc_info=True)
                 raise ValidationError("Failed to initialize payment")
     
     def verify_payment(self, reference):
-        """Verify payment status with Paystack"""
+      
         logger.info(f"Verifying payment - Reference: {reference}")
         
         if not reference:
@@ -180,7 +179,7 @@ class PaystackService:
         try:
             response = self._make_request("GET", f"/transaction/verify/{reference}")
             
-            # Validate response structure
+        
             if not response.get('status'):
                 error_msg = response.get('message', 'Unknown verification error')
                 logger.error(f"Paystack verification failed: {error_msg}")
@@ -196,10 +195,9 @@ class PaystackService:
             raise ValidationError("Failed to verify payment")
     
     def create_transfer_recipient(self, name, account_number, bank_code):
-        """Create transfer recipient for sellers (optional)"""
+       
         logger.info(f"Creating transfer recipient - Name: {name}, Bank: {bank_code}")
-        
-        # Validate inputs
+       
         if not all([name, account_number, bank_code]):
             raise ValidationError("Name, account number, and bank code are required")
         
@@ -229,7 +227,7 @@ class PaystackService:
             raise ValidationError("Failed to create transfer recipient")
 
     def check_balance(self):
-        """Check Paystack account balance (optional)"""
+     
         try:
             response = self._make_request("GET", "/balance")
             return response
