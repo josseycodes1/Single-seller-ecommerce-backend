@@ -57,14 +57,14 @@ def password_reset_request(request):
     serializer = PasswordResetRequestSerializer(data=request.data)
     
     if serializer.is_valid():
-        email = serializer.validated_data['email']  # Get the email from validated data
+        email = serializer.validated_data['email'] 
         reset_code = serializer.save()
         
         send_mail(
             'Password Reset Code',
             f'Your password reset code is: {reset_code}. It expires in 15 minutes.',
             settings.DEFAULT_FROM_EMAIL,
-            [email],  # Use the email variable
+            [email], 
             fail_silently=False,
         )
 
@@ -191,8 +191,6 @@ class ProductViewSet(viewsets.ModelViewSet):
                 pass  # Ignore invalid limit values
         
         return queryset
-
-
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
@@ -589,6 +587,7 @@ class InitializePaymentAPIView(APIView):
             metadata = {
                 "order_id": order.id,
                 "customer_name": order.customer_name,
+                "customer_phone": str(order.customer_phone), 
                 "items_count": cart.items.count(),
                 "custom_fields": [
                     {
@@ -600,6 +599,11 @@ class InitializePaymentAPIView(APIView):
                         "display_name": "Shipping Address",
                         "variable_name": "shipping_address",
                         "value": f"{order.address.street_address}, {order.address.town}, {order.address.state}"
+                    },
+                    {
+                        "display_name": "Customer Phone",  
+                        "variable_name": "customer_phone",
+                        "value": str(order.customer_phone) 
                     },
                     {
                         "display_name": "Order Notes", 
@@ -812,6 +816,7 @@ class PaymentWebhookAPIView(View):
         ).hexdigest()
 
         return hmac.compare_digest(computed_signature, signature)
+
 class OrderListAPIView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = [] 
