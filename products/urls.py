@@ -14,7 +14,8 @@ from .views import (
         CartItemAPIView, 
         ClearCartAPIView,
         password_resend_code,
-        GuestOrderListAPIView
+        GuestOrderListAPIView,
+        RecentProductsAPIView
        
 )
 from .views import CheckoutAPIView, InitializePaymentAPIView, VerifyPaymentAPIView, PaymentWebhookAPIView
@@ -41,4 +42,5 @@ urlpatterns = [
     path('payment/verify/', VerifyPaymentAPIView.as_view(), name='verify-payment'),
     path('payment/webhook/', PaymentWebhookAPIView.as_view(), name='payment-webhook'),
     path('guest/orders/', GuestOrderListAPIView.as_view(), name='guest-orders'),
+    path("products/recent/", RecentProductsAPIView.as_view(), name="recent-products"),
 ]

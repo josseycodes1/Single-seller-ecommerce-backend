@@ -136,12 +136,12 @@ class ProductViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "description"]  
     ordering_fields = ["price", "created_at"] 
     
-    #allow public access for listing and retrieving products
+ 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             permission_classes = [AllowAny]
         else:
-            #require authentication for create, update, delete
+         
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
 
@@ -174,7 +174,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Product.objects.all()
         
-        # Handle is_featured filter
+   
         is_featured = self.request.query_params.get('is_featured')
         if is_featured is not None:
             if is_featured.lower() == 'true':
@@ -182,15 +182,16 @@ class ProductViewSet(viewsets.ModelViewSet):
             elif is_featured.lower() == 'false':
                 queryset = queryset.filter(is_featured=False)
         
-        # Handle limit parameter
+       
         limit = self.request.query_params.get('limit')
         if limit is not None:
             try:
                 queryset = queryset[:int(limit)]
             except ValueError:
-                pass  # Ignore invalid limit values
+                pass 
         
         return queryset
+    
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
@@ -957,3 +958,20 @@ class GuestOrderListAPIView(APIView):
             print(f"DEBUG: Error fetching guest orders: {str(e)}")
             logger.error(f"Error fetching guest orders: {str(e)}", exc_info=True)
             return Response({"error": "Failed to fetch orders"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class RecentProductsAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        try:
+            limit = int(request.GET.get('limit', 6))
+            products = Product.objects.all().order_by('-updated_at')[:limit]
+            serializer = ProductSerializer(products, many=True, context={'request': request})
+            
+            return Response(serializer.data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching recent products: {str(e)}")
+            return Response({
+                "error": "Failed to fetch recent products"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
