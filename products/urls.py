@@ -1,24 +1,27 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
 from .views import (
-        CategoryViewSet, 
-        ProductViewSet, 
-        OrderViewSet, 
-        NewsletterSubscriptionViewSet, 
-        BannerViewSet, 
-        SellerRegisterView,
-        CustomTokenObtainPairView,  
-        password_reset_request, 
-        password_reset_confirm,
-        CartAPIView, 
-        CartItemAPIView, 
-        ClearCartAPIView,
-        password_resend_code,
-        GuestOrderListAPIView,
-        RecentProductsAPIView
-       
+    CategoryViewSet, 
+    ProductViewSet, 
+    OrderViewSet, 
+    NewsletterSubscriptionViewSet, 
+    BannerViewSet, 
+    SellerRegisterView,
+    CustomTokenObtainPairView,  
+    password_reset_request, 
+    password_reset_confirm,
+    CartAPIView, 
+    CartItemAPIView, 
+    ClearCartAPIView,
+    password_resend_code,
+    GuestOrderListAPIView,
+    RecentProductsAPIView,
+    CheckoutAPIView, 
+    InitializePaymentAPIView, 
+    VerifyPaymentAPIView, 
+    PaymentWebhookAPIView
 )
-from .views import CheckoutAPIView, InitializePaymentAPIView, VerifyPaymentAPIView, PaymentWebhookAPIView
+
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet)
 router.register(r'products', ProductViewSet)
@@ -27,7 +30,13 @@ router.register(r'newsletter', NewsletterSubscriptionViewSet)
 router.register(r'banners', BannerViewSet)
 
 urlpatterns = [
+    # CUSTOM ROUTES
+    path("products/recent/", RecentProductsAPIView.as_view(), name="recent-products"),
+    
+    #router routes
     path("", include(router.urls)), 
+    
+    # Other custom routes
     path("register/seller/", SellerRegisterView.as_view(), name="seller-register"),
     path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/password-reset/request/", password_reset_request, name="password-reset-request"),
@@ -42,5 +51,4 @@ urlpatterns = [
     path('payment/verify/', VerifyPaymentAPIView.as_view(), name='verify-payment'),
     path('payment/webhook/', PaymentWebhookAPIView.as_view(), name='payment-webhook'),
     path('guest/orders/', GuestOrderListAPIView.as_view(), name='guest-orders'),
-    path("products/recent/", RecentProductsAPIView.as_view(), name="recent-products"),
 ]
