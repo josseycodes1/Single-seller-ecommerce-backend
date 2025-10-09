@@ -983,36 +983,103 @@ class ContactMessageAPIView(APIView):
     def post(self, request):
         logger.info(f"Contact form submission received: {request.data}")
         
-        serializer = ContactMessageSerializer(data=request.data)
-        
-        if serializer.is_valid():
+        try:
+            # Check if request data is JSON
+            if not request.data:
+                return Response({
+                    "success": False,
+                    "error": {
+                        "code": "NO_DATA",
+                        "message": "No data provided in request",
+                        "details": "Request body is empty"
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate required fields
+            required_fields = ['name', 'email', 'subject', 'message']
+            missing_fields = []
+            invalid_fields = []
+            
+            for field in required_fields:
+                if field not in request.data:
+                    missing_fields.append(field)
+                elif not isinstance(request.data[field], str) or not request.data[field].strip():
+                    invalid_fields.append({
+                        "field": field,
+                        "issue": "Field is empty or not a valid string"
+                    })
+            
+            if missing_fields or invalid_fields:
+                return Response({
+                    "success": False,
+                    "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Form validation failed",
+                        "details": {
+                            "missing_fields": missing_fields,
+                            "invalid_fields": invalid_fields
+                        }
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Email format validation
+            email = request.data['email']
+            if '@' not in email or '.' not in email:
+                return Response({
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_EMAIL",
+                        "message": "Invalid email format",
+                        "details": "Please provide a valid email address"
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate field lengths
+            field_limits = {
+                'name': 255,
+                'email': 254,
+                'subject': 255,
+                'message': 5000  # Adjust as needed
+            }
+            
+            length_errors = []
+            for field, max_length in field_limits.items():
+                if len(request.data[field]) > max_length:
+                    length_errors.append({
+                        "field": field,
+                        "issue": f"Field exceeds maximum length of {max_length} characters",
+                        "current_length": len(request.data[field])
+                    })
+            
+            if length_errors:
+                return Response({
+                    "success": False,
+                    "error": {
+                        "code": "FIELD_TOO_LONG",
+                        "message": "Some fields are too long",
+                        "details": {
+                            "length_errors": length_errors
+                        }
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Use serializer for validation
+            serializer = ContactMessageSerializer(data=request.data)
+            
+            if not serializer.is_valid():
+                return Response({
+                    "success": False,
+                    "error": {
+                        "code": "SERIALIZER_VALIDATION_ERROR",
+                        "message": "Data validation failed",
+                        "details": serializer.errors
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Save to database
             try:
-                
                 contact_message = serializer.save()
-                
-                logger.info(f"Contact message saved successfully - ID: {contact_message.id}, Email: {contact_message.email}")
-                
-               
-                try:
-                    send_mail(
-                        f'New Contact Message: {contact_message.subject}',
-                        f'''
-                        New contact message received:
-                        
-                        Name: {contact_message.name}
-                        Email: {contact_message.email}
-                        Subject: {contact_message.subject}
-                        Message: {contact_message.message}
-                        
-                        You can view and manage this message in the admin panel.
-                        ''',
-                        settings.DEFAULT_FROM_EMAIL,
-                        [settings.ADMIN_EMAIL],  
-                        fail_silently=True,
-                    )
-                    logger.info("Contact message notification email sent successfully")
-                except Exception as e:
-                    logger.warning(f"Failed to send contact message notification email: {str(e)}")
+                logger.info(f"Contact message saved successfully - ID: {contact_message.id}")
                 
                 return Response({
                     "success": True,
@@ -1021,22 +1088,53 @@ class ContactMessageAPIView(APIView):
                         "id": contact_message.id,
                         "name": contact_message.name,
                         "email": contact_message.email,
-                        "subject": contact_message.subject
+                        "subject": contact_message.subject,
+                        "status": contact_message.status,
+                        "created_at": contact_message.created_at.isoformat()
                     }
                 }, status=status.HTTP_201_CREATED)
                 
-            except Exception as e:
-                logger.error(f"Error saving contact message: {str(e)}", exc_info=True)
-                return Response({
-                    "error": "Failed to send message. Please try again.",
-                    "details": str(e),
-                    "type": type(e).__name__
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-       
-        logger.error(f"Contact form validation failed: {serializer.errors}")
-        return Response({
-            "error": "Invalid data",
-            "details": serializer.errors,
-            "field_errors": serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as save_error:
+                logger.error(f"Database save error: {str(save_error)}", exc_info=True)
+                
+                # Handle specific database errors
+                if "unique" in str(save_error).lower():
+                    return Response({
+                        "success": False,
+                        "error": {
+                            "code": "DATABASE_ERROR",
+                            "message": "Database constraint violation",
+                            "details": "A similar record might already exist"
+                        }
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({
+                        "success": False,
+                        "error": {
+                            "code": "DATABASE_SAVE_ERROR",
+                            "message": "Failed to save message to database",
+                            "details": "Please try again later"
+                        }
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    
+        except json.JSONDecodeError:
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "INVALID_JSON",
+                    "message": "Invalid JSON in request body",
+                    "details": "Please check your request format"
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as unexpected_error:
+            logger.error(f"Unexpected error in contact API: {str(unexpected_error)}", exc_info=True)
+            
+            return Response({
+                "success": False,
+                "error": {
+                    "code": "INTERNAL_SERVER_ERROR",
+                    "message": "An unexpected error occurred",
+                    "details": "Please try again later"
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

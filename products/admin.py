@@ -205,27 +205,10 @@ class UserAdmin(admin.ModelAdmin):
     
 @admin.register(ContactMessage)
 class ContactMessageAdmin(admin.ModelAdmin):
-    list_display = ('name', 'email', 'subject', 'status', 'created_at')
-    list_filter = ('status', 'created_at')
-    search_fields = ('name', 'email', 'subject', 'message')
-    readonly_fields = ('created_at', 'updated_at')
-    list_editable = ('status',)
-    
-    fieldsets = (
-        ('Contact Information', {
-            'fields': ('name', 'email', 'subject', 'message')
-        }),
-        ('Status & Management', {
-            'fields': ('status',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
-    
-    def has_add_permission(self, request):
-        return False
+    list_display = ['name', 'email', 'subject', 'status', 'created_at']
+    list_filter = ['status', 'created_at']
+    search_fields = ['name', 'email', 'subject']
+    readonly_fields = ['created_at', 'updated_at']
 
 
 admin.site.site_header = "E-commerce Admin"
