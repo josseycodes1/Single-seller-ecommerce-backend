@@ -19,7 +19,8 @@ from .views import (
     CheckoutAPIView, 
     InitializePaymentAPIView, 
     VerifyPaymentAPIView, 
-    PaymentWebhookAPIView
+    PaymentWebhookAPIView,
+    ContactMessageAPIView 
 )
 
 router = DefaultRouter()
@@ -51,4 +52,5 @@ urlpatterns = [
     path('payment/verify/', VerifyPaymentAPIView.as_view(), name='verify-payment'),
     path('payment/webhook/', PaymentWebhookAPIView.as_view(), name='payment-webhook'),
     path('guest/orders/', GuestOrderListAPIView.as_view(), name='guest-orders'),
+    path('contact/', ContactMessageAPIView.as_view(), name='contact-message'),
 ]

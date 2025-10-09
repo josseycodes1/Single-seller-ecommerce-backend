@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets
-from .models import Category, Product, Order, NewsletterSubscription, Banner, Payment, OrderItem, Address
+from .models import Category, Product, Order, NewsletterSubscription, Banner, Payment, OrderItem, Address, ContactMessage
 from .serializers import (
     CategorySerializer,
     ProductSerializer,
@@ -10,7 +10,8 @@ from .serializers import (
     SellerRegisterSerializer,
     CartSerializer, 
     AddToCartSerializer, 
-    UpdateCartItemSerializer
+    UpdateCartItemSerializer,
+    ContactMessageSerializer
 )
 from rest_framework.permissions import BasePermission
 from rest_framework import generics
@@ -975,3 +976,58 @@ class RecentProductsAPIView(APIView):
             return Response({
                 "error": "Failed to fetch recent products"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+class ContactMessageAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = ContactMessageSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            try:
+               
+                contact_message = serializer.save()
+                
+              
+                try:
+                    send_mail(
+                        f'New Contact Message: {contact_message.subject}',
+                        f'''
+                        New contact message received:
+                        
+                        Name: {contact_message.name}
+                        Email: {contact_message.email}
+                        Subject: {contact_message.subject}
+                        Message: {contact_message.message}
+                        
+                        You can view and manage this message in the admin panel.
+                        ''',
+                        settings.DEFAULT_FROM_EMAIL,
+                        [settings.ADMIN_EMAIL], 
+                        fail_silently=True,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to send contact message notification email: {str(e)}")
+                
+                return Response({
+                    "success": True,
+                    "message": "Message sent successfully! We'll get back to you soon.",
+                    "data": {
+                        "id": contact_message.id,
+                        "name": contact_message.name,
+                        "email": contact_message.email,
+                        "subject": contact_message.subject
+                    }
+                }, status=status.HTTP_201_CREATED)
+                
+            except Exception as e:
+                logger.error(f"Error saving contact message: {str(e)}")
+                return Response({
+                    "error": "Failed to send message. Please try again.",
+                    "details": str(e)
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        return Response({
+            "error": "Invalid data",
+            "details": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)

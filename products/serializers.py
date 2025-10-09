@@ -10,7 +10,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.text import slugify
 from rest_framework import serializers
-from .models import Product, CartItem
+from .models import Product, CartItem, ContactMessage
 import json
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -440,4 +440,25 @@ class CheckoutSerializer(serializers.Serializer):
         for field in required_fields:
             if field not in value or not value[field]:
                 raise serializers.ValidationError(f"Address field '{field}' is required")
+        return value
+    
+class ContactMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactMessage
+        fields = ['id', 'name', 'email', 'subject', 'message', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'status', 'created_at', 'updated_at']
+    
+    def validate_name(self, value):
+        if len(value.strip()) < 2:
+            raise serializers.ValidationError("Name must be at least 2 characters long.")
+        return value
+    
+    def validate_subject(self, value):
+        if len(value.strip()) < 5:
+            raise serializers.ValidationError("Subject must be at least 5 characters long.")
+        return value
+    
+    def validate_message(self, value):
+        if len(value.strip()) < 10:
+            raise serializers.ValidationError("Message must be at least 10 characters long.")
         return value
