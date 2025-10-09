@@ -981,14 +981,18 @@ class ContactMessageAPIView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
+        logger.info(f"Contact form submission received: {request.data}")
+        
         serializer = ContactMessageSerializer(data=request.data)
         
         if serializer.is_valid():
             try:
-               
+                
                 contact_message = serializer.save()
                 
-              
+                logger.info(f"Contact message saved successfully - ID: {contact_message.id}, Email: {contact_message.email}")
+                
+               
                 try:
                     send_mail(
                         f'New Contact Message: {contact_message.subject}',
@@ -1003,9 +1007,10 @@ class ContactMessageAPIView(APIView):
                         You can view and manage this message in the admin panel.
                         ''',
                         settings.DEFAULT_FROM_EMAIL,
-                        [settings.ADMIN_EMAIL], 
+                        [settings.ADMIN_EMAIL],  
                         fail_silently=True,
                     )
+                    logger.info("Contact message notification email sent successfully")
                 except Exception as e:
                     logger.warning(f"Failed to send contact message notification email: {str(e)}")
                 
@@ -1021,13 +1026,17 @@ class ContactMessageAPIView(APIView):
                 }, status=status.HTTP_201_CREATED)
                 
             except Exception as e:
-                logger.error(f"Error saving contact message: {str(e)}")
+                logger.error(f"Error saving contact message: {str(e)}", exc_info=True)
                 return Response({
                     "error": "Failed to send message. Please try again.",
-                    "details": str(e)
+                    "details": str(e),
+                    "type": type(e).__name__
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
+       
+        logger.error(f"Contact form validation failed: {serializer.errors}")
         return Response({
             "error": "Invalid data",
-            "details": serializer.errors
+            "details": serializer.errors,
+            "field_errors": serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
