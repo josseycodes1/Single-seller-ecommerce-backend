@@ -31,13 +31,13 @@ router.register(r'newsletter', NewsletterSubscriptionViewSet)
 router.register(r'banners', BannerViewSet)
 
 urlpatterns = [
-    # CUSTOM ROUTES
+    
     path("products/recent/", RecentProductsAPIView.as_view(), name="recent-products"),
     
-    #router routes
+
     path("", include(router.urls)), 
     
-    # Other custom routes
+ 
     path("register/seller/", SellerRegisterView.as_view(), name="seller-register"),
     path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/password-reset/request/", password_reset_request, name="password-reset-request"),

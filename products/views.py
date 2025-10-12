@@ -96,7 +96,7 @@ def password_resend_code(request):
     if serializer.is_valid():
         reset_code, email = serializer.save()
         
-        # Send email with the new code
+      
         send_mail(
             'Password Reset Code',
             f'Your new password reset code is: {reset_code}. It expires in 15 minutes.',
@@ -202,15 +202,15 @@ class NewsletterSubscriptionViewSet(viewsets.ModelViewSet):
     serializer_class = NewsletterSerializer
     
     def get_permissions(self):
-        # Allow anyone to create subscriptions (POST)
+
         if self.action in ['create']:
             permission_classes = [AllowAny]
         else:
-            # Require authentication for other operations (list, retrieve, update, delete)
+           
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
     
-    # Add CSRF exemption for create action
+   
     @method_decorator(csrf_exempt, name='dispatch')
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
@@ -984,7 +984,7 @@ class ContactMessageAPIView(APIView):
         logger.info(f"Contact form submission received: {request.data}")
         
         try:
-            # Check if request data is JSON
+        
             if not request.data:
                 return Response({
                     "success": False,
@@ -995,7 +995,7 @@ class ContactMessageAPIView(APIView):
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Validate required fields
+      
             required_fields = ['name', 'email', 'subject', 'message']
             missing_fields = []
             invalid_fields = []
@@ -1022,7 +1022,7 @@ class ContactMessageAPIView(APIView):
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Email format validation
+       
             email = request.data['email']
             if '@' not in email or '.' not in email:
                 return Response({
@@ -1034,12 +1034,12 @@ class ContactMessageAPIView(APIView):
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Validate field lengths
+          
             field_limits = {
                 'name': 255,
                 'email': 254,
                 'subject': 255,
-                'message': 5000  # Adjust as needed
+                'message': 5000 
             }
             
             length_errors = []
@@ -1063,7 +1063,7 @@ class ContactMessageAPIView(APIView):
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Use serializer for validation
+      
             serializer = ContactMessageSerializer(data=request.data)
             
             if not serializer.is_valid():
@@ -1076,7 +1076,7 @@ class ContactMessageAPIView(APIView):
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Save to database
+          
             try:
                 contact_message = serializer.save()
                 logger.info(f"Contact message saved successfully - ID: {contact_message.id}")
@@ -1097,7 +1097,7 @@ class ContactMessageAPIView(APIView):
             except Exception as save_error:
                 logger.error(f"Database save error: {str(save_error)}", exc_info=True)
                 
-                # Handle specific database errors
+   
                 if "unique" in str(save_error).lower():
                     return Response({
                         "success": False,
