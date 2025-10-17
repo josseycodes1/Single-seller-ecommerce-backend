@@ -443,7 +443,6 @@ class CheckoutAPIView(APIView):
                 address_data = serializer.validated_data['address']
                 order_notes = serializer.validated_data.get('order_notes', '')
                 
-              
                 try:
                     cart = Cart.objects.get(id=cart_id)
                 except Cart.DoesNotExist:
@@ -458,7 +457,6 @@ class CheckoutAPIView(APIView):
                         "details": "Cannot checkout with an empty cart"
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
-               
                 try:
                     address = Address.objects.create(
                         country=address_data['country'],
@@ -467,7 +465,6 @@ class CheckoutAPIView(APIView):
                         state=address_data['state'],
                         postal_code=address_data['postal_code'],
                         is_default=False
-                      
                     )
                 except Exception as e:
                     return Response({
@@ -475,7 +472,6 @@ class CheckoutAPIView(APIView):
                         "details": str(e)
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
-        
                 try:
                     order = Order.objects.create(
                         customer_name=customer_name,
@@ -492,8 +488,9 @@ class CheckoutAPIView(APIView):
                         "field_errors": "Check customer_phone format or other field constraints"
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
-             
-                total_amount = 0
+                # Calculate totals with tax
+                TAX_RATE = 0.02
+                subtotal = 0
                 try:
                     for cart_item in cart.items.all():
                         OrderItem.objects.create(
@@ -503,12 +500,15 @@ class CheckoutAPIView(APIView):
                             price=cart_item.product.price,
                             color=cart_item.color
                         )
-                        total_amount += cart_item.quantity * cart_item.product.price
+                        subtotal += cart_item.quantity * cart_item.product.price
                 except Exception as e:
                     return Response({
                         "error": "Failed to create order items",
                         "details": str(e)
                     }, status=status.HTTP_400_BAD_REQUEST)
+                
+                tax_amount = subtotal * TAX_RATE
+                total_amount = subtotal + tax_amount
                 
                 order.total_amount = total_amount
                 order.save()
@@ -516,6 +516,8 @@ class CheckoutAPIView(APIView):
                 return Response({
                     "success": True,
                     "order_id": order.id,
+                    "subtotal": float(subtotal),
+                    "tax_amount": float(tax_amount),
                     "total_amount": float(total_amount),
                     "message": "Order created successfully"
                 }, status=status.HTTP_201_CREATED)
@@ -558,8 +560,13 @@ class InitializePaymentAPIView(APIView):
             
             print(f"DEBUG: Cart ID: {cart.id}, Order ID: {order.id}, Email: {email}")
             
-            total_amount = cart.get_total_price()
-            print(f"DEBUG: Total amount: {total_amount}")
+            # Calculate total with tax (2%)
+            TAX_RATE = 0.02
+            subtotal = float(cart.get_total_price())
+            tax_amount = subtotal * TAX_RATE
+            total_amount = subtotal + tax_amount
+            
+            print(f"DEBUG: Subtotal: {subtotal}, Tax: {tax_amount}, Total: {total_amount}")
             
             if total_amount <= 0:
                 print(f"DEBUG: Invalid amount: {total_amount}")
@@ -579,8 +586,17 @@ class InitializePaymentAPIView(APIView):
                 callback_url = f"{settings.FRONTEND_URL}/payment/verify"
                 print(f"DEBUG: Using callback URL: {callback_url}")
             
-            amount_in_kobo = float(total_amount) * 100
+            # FIX: Convert to kobo correctly
+            amount_in_kobo = int(round(total_amount * 100))  # Use int() and round() for safety
             print(f"DEBUG: Amount in kobo: {amount_in_kobo}")
+            
+            # Verify the amount is reasonable
+            if amount_in_kobo > 1000000000:  # 10 million naira safety limit
+                print(f"DEBUG: Amount too large: {amount_in_kobo}")
+                return Response({
+                    "error": "Amount too large",
+                    "details": "Payment amount exceeds maximum limit"
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             order_items = []
             for item in cart.items.all():
@@ -591,6 +607,9 @@ class InitializePaymentAPIView(APIView):
                 "customer_name": order.customer_name,
                 "customer_phone": str(order.customer_phone), 
                 "items_count": cart.items.count(),
+                "subtotal": subtotal,
+                "tax_amount": tax_amount,
+                "total_amount": total_amount,
                 "custom_fields": [
                     {
                         "display_name": "Order Items",
@@ -618,7 +637,7 @@ class InitializePaymentAPIView(APIView):
             print("DEBUG: Calling Paystack initialize_payment...")
             paystack_response = paystack_service.initialize_payment(
                 email=email,
-                amount=amount_in_kobo,
+                amount=amount_in_kobo,  # Correct amount in kobo
                 reference=payment_reference,
                 callback_url=callback_url,
                 metadata=metadata 
@@ -631,7 +650,7 @@ class InitializePaymentAPIView(APIView):
                 payment = Payment.objects.create(
                     order=order,  
                     payment_reference=payment_reference,
-                    amount=total_amount,
+                    amount=total_amount,  # Store the total amount with tax
                     email=email,
                     status='pending'
                 )
@@ -642,7 +661,7 @@ class InitializePaymentAPIView(APIView):
                     "authorization_url": paystack_response['data']['authorization_url'],
                     "access_code": paystack_response['data']['access_code'],
                     "reference": payment_reference,
-                    "amount": float(total_amount),
+                    "amount": float(total_amount),  # Return the total amount
                     "email": email,
                     "callback_url": callback_url
                 }, status=status.HTTP_200_OK)
