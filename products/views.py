@@ -488,7 +488,7 @@ class CheckoutAPIView(APIView):
                         "field_errors": "Check customer_phone format or other field constraints"
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
-                # Calculate totals with tax
+                # Calculate totals with tax - FIXED: Convert to float first
                 TAX_RATE = 0.02
                 subtotal = 0
                 try:
@@ -500,17 +500,22 @@ class CheckoutAPIView(APIView):
                             price=cart_item.product.price,
                             color=cart_item.color
                         )
-                        subtotal += cart_item.quantity * cart_item.product.price
+                        # Convert Decimal to float for calculation
+                        item_total = float(cart_item.product.price) * cart_item.quantity
+                        subtotal += item_total
                 except Exception as e:
                     return Response({
                         "error": "Failed to create order items",
                         "details": str(e)
                     }, status=status.HTTP_400_BAD_REQUEST)
                 
+                # Calculate tax and total - using float values
                 tax_amount = subtotal * TAX_RATE
                 total_amount = subtotal + tax_amount
                 
-                order.total_amount = total_amount
+                # Convert back to Decimal for saving to database
+                from decimal import Decimal
+                order.total_amount = Decimal(str(total_amount))
                 order.save()
                 
                 return Response({
@@ -560,13 +565,19 @@ class InitializePaymentAPIView(APIView):
             
             print(f"DEBUG: Cart ID: {cart.id}, Order ID: {order.id}, Email: {email}")
             
-            # Calculate total with tax (2%)
+            # Calculate total with tax (2%) - FIXED: Use order total_amount which is already calculated
             TAX_RATE = 0.02
-            subtotal = float(cart.get_total_price())
-            tax_amount = subtotal * TAX_RATE
-            total_amount = subtotal + tax_amount
             
-            print(f"DEBUG: Subtotal: {subtotal}, Tax: {tax_amount}, Total: {total_amount}")
+            # Use the order's total_amount which should already include tax
+            if order.total_amount:
+                total_amount = float(order.total_amount)
+                print(f"DEBUG: Using order total_amount: {total_amount}")
+            else:
+                # Fallback: calculate from cart
+                subtotal = float(cart.get_total_price())
+                tax_amount = subtotal * TAX_RATE
+                total_amount = subtotal + tax_amount
+                print(f"DEBUG: Calculated from cart - Subtotal: {subtotal}, Tax: {tax_amount}, Total: {total_amount}")
             
             if total_amount <= 0:
                 print(f"DEBUG: Invalid amount: {total_amount}")
@@ -586,12 +597,12 @@ class InitializePaymentAPIView(APIView):
                 callback_url = f"{settings.FRONTEND_URL}/payment/verify"
                 print(f"DEBUG: Using callback URL: {callback_url}")
             
-            # FIX: Convert to kobo correctly
-            amount_in_kobo = int(round(total_amount * 100))  # Use int() and round() for safety
+            # Convert to kobo correctly
+            amount_in_kobo = int(round(total_amount * 100))
             print(f"DEBUG: Amount in kobo: {amount_in_kobo}")
             
             # Verify the amount is reasonable
-            if amount_in_kobo > 1000000000:  # 10 million naira safety limit
+            if amount_in_kobo > 1000000000:
                 print(f"DEBUG: Amount too large: {amount_in_kobo}")
                 return Response({
                     "error": "Amount too large",
@@ -607,9 +618,9 @@ class InitializePaymentAPIView(APIView):
                 "customer_name": order.customer_name,
                 "customer_phone": str(order.customer_phone), 
                 "items_count": cart.items.count(),
-                "subtotal": subtotal,
-                "tax_amount": tax_amount,
-                "total_amount": total_amount,
+                "subtotal": float(cart.get_total_price()),
+                "tax_amount": float(total_amount) - float(cart.get_total_price()),
+                "total_amount": float(total_amount),
                 "custom_fields": [
                     {
                         "display_name": "Order Items",
@@ -637,7 +648,7 @@ class InitializePaymentAPIView(APIView):
             print("DEBUG: Calling Paystack initialize_payment...")
             paystack_response = paystack_service.initialize_payment(
                 email=email,
-                amount=amount_in_kobo,  # Correct amount in kobo
+                amount=amount_in_kobo,
                 reference=payment_reference,
                 callback_url=callback_url,
                 metadata=metadata 
@@ -650,7 +661,7 @@ class InitializePaymentAPIView(APIView):
                 payment = Payment.objects.create(
                     order=order,  
                     payment_reference=payment_reference,
-                    amount=total_amount,  # Store the total amount with tax
+                    amount=total_amount,
                     email=email,
                     status='pending'
                 )
@@ -661,7 +672,7 @@ class InitializePaymentAPIView(APIView):
                     "authorization_url": paystack_response['data']['authorization_url'],
                     "access_code": paystack_response['data']['access_code'],
                     "reference": payment_reference,
-                    "amount": float(total_amount),  # Return the total amount
+                    "amount": float(total_amount),
                     "email": email,
                     "callback_url": callback_url
                 }, status=status.HTTP_200_OK)
